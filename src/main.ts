@@ -13,7 +13,10 @@ const game = new Phaser.Game({
   backgroundColor: '#2a1d4a',
   // antialias — сглаживание текстур; antialiasGL (MSAA всего экрана) выключен: на телефоне это
   // 4 выборки на каждый пиксель 2392×1080, а картинки и так гладкие
-  render: { roundPixels: true, antialias: true, antialiasGL: false, powerPreference: 'high-performance' },
+  // batchSize: Phaser по умолчанию держит буфер вершин на 4096 спрайтов (~700 КБ) и перезаписывает
+  // его между отрисовками; драйвер Mali при этом копирует буфер целиком (десятки раз за кадр) —
+  // кадр упирался в поток GPU, а не в пиксели. Маленький буфер копируется почти даром.
+  render: { roundPixels: true, antialias: true, antialiasGL: false, powerPreference: 'high-performance', batchSize: 512 },
   scale: {
     // высота всегда 1080, ширина подстраивается под экран: на длинных телефонах видно больше по бокам
     mode: Phaser.Scale.EXPAND,

@@ -52,6 +52,9 @@ export class Hero {
   private sq = 0;
   private sqVel = 0;
   private lean = 0;
+  /** покачивание после толчка шалуна, градусы */
+  private wob = 0;
+  private wobVel = 0;
   private speed = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, private dust: Dust) {
@@ -127,6 +130,12 @@ export class Hero {
     return { x: this.x + hand.x * this.facing, y: this.y + hand.y };
   }
 
+  /** Шалун толкнул: сплющило и качнуло (dir — куда отлетаем). */
+  ouch(dir: number) {
+    this.kick(-0.16);
+    this.wobVel = -dir * 420;
+  }
+
   /** Толчок пружины squash: < 0 — сплющить, > 0 — вытянуть. */
   kick(amount: number) {
     if (amount === 0) return;
@@ -159,7 +168,9 @@ export class Hero {
     this.lean += (leanTarget - this.lean) * lerpK(12, dt);
     if (Math.abs(this.lean) < 0.05) this.lean = 0;
 
-    this.root.setScale(sx, sy).setRotation(Phaser.Math.DegToRad(this.lean * this.facing));
+    this.wobVel += (-160 * this.wob - 9 * this.wobVel) * dt;
+    this.wob += this.wobVel * dt;
+    this.root.setScale(sx, sy).setRotation(Phaser.Math.DegToRad(this.lean * this.facing + this.wob));
 
     this.speed = m.speed;
 

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { feedback } from '../audio/feedback';
-import type { Drone } from './Drone';
+import type { WebTarget } from './Critter';
 import type { Sparks } from './fx';
 import type { Solid } from './Level';
 
@@ -18,7 +18,7 @@ interface Shot {
   y: number;
   dirX: number;
   dirY: number;
-  target: Drone | null;
+  target: WebTarget | null;
   age: number;
   trail: { x: number; y: number }[];
   head: Phaser.GameObjects.Image;
@@ -37,7 +37,7 @@ interface Splat {
  * Паутина: из ладони вылетает крутящийся паутинный шарик с коротким дрожащим хвостом
  * из двух нитей. Промах летит, пока не уйдёт за экран, и там просто исчезает.
  * Попадание в стену — сеточка паутины прилипает к ней примерно на секунду;
- * в дрона — вспышка-сеточка, искры, лёгкая тряска камеры.
+ * в шалуна — вспышка-сеточка, искры, лёгкая тряска камеры.
  */
 export class Web {
   private g: Phaser.GameObjects.Graphics;
@@ -56,10 +56,10 @@ export class Web {
     glowLayer.add(this.g);
   }
 
-  fire(from: { x: number; y: number }, facing: number, drones: Drone[]) {
-    let target: Drone | null = null;
+  fire(from: { x: number; y: number }, facing: number, targets: WebTarget[]) {
+    let target: WebTarget | null = null;
     let best = Infinity;
-    for (const d of drones) {
+    for (const d of targets) {
       if (!d.alive) continue;
       const dx = d.x - from.x;
       const dy = d.y - from.y;

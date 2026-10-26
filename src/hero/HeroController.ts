@@ -25,6 +25,10 @@ const SHOOT_COOLDOWN = 0.4;
 const JUMP_BUFFER = 0.12;
 /** Сошёл с края — ещё столько можно прыгнуть «с воздуха». */
 const COYOTE = 0.1;
+/** Толчок шалуна: отлетаем назад-вверх и чуть-чуть не слушаемся кнопок. Без урона. */
+const BUMP_VX = 560;
+const BUMP_VY = 620;
+const BUMP_STUN = 0.35;
 /** Первые доли секунды прыжок не обрезается — даже лёгкий тап даёт заметный прыжок. */
 const MIN_JUMP_TIME = 0.1;
 
@@ -51,6 +55,7 @@ export class HeroController {
   private coyote = 0;
   private jumpT = 99;
   private fallV = 0;
+  private stun = 0;
 
   /** Приземление: скорость падения, px/с (для тряски камеры с высоты). */
   onLand: (fallSpeed: number) => void = () => {};
@@ -77,8 +82,10 @@ export class HeroController {
     let dir = (this.input.right ? 1 : 0) - (this.input.left ? 1 : 0);
     this.lock = Math.max(0, this.lock - dt);
     if (this.lock > 0 && dir === this.lockDir) dir = 0;
+    this.stun = Math.max(0, this.stun - dt);
+    if (this.stun > 0) dir = 0;
     this.cooldown = Math.max(0, this.cooldown - dt);
-    if (this.input.jumpPressed) this.jumpBuffer = JUMP_BUFFER;
+    if (this.input.jumpPressed && this.stun === 0) this.jumpBuffer = JUMP_BUFFER;
     else this.jumpBuffer = Math.max(0, this.jumpBuffer - dt);
 
     const m = this.wallDir !== 0 ? this.stepWall(dir) : this.stepFree(dt, dir);
@@ -113,8 +120,8 @@ export class HeroController {
     if (dir !== 0) {
       this.vx += dir * ACCEL * dt;
       h.facing = dir;
-    } else if (!(this.lock > 0 && !this.grounded)) {
-      // сразу после отталкивания от стены импульс не гасим
+    } else if (!((this.lock > 0 || this.stun > 0) && !this.grounded)) {
+      // сразу после отталкивания от стены или толчка импульс не гасим
       const s = Math.sign(this.vx);
       this.vx -= s * (this.grounded ? DECEL : AIR_DECEL) * dt;
       if (Math.sign(this.vx) !== s) this.vx = 0;
@@ -163,6 +170,23 @@ export class HeroController {
       groundY: this.level.floorAt(b.center.x, b.bottom, HERO_HITBOX.w / 2),
       ground: this.level.surfaceAt(b.center.x, b.bottom, HERO_HITBOX.w / 2),
     };
+  }
+
+  /** Шалун толкнул: dir — куда отлетаем (1 вправо, -1 влево). */
+  bump(dir: number) {
+    const b = this.body;
+    if (this.wallDir !== 0) this.release();
+    this.vx = dir * BUMP_VX;
+    b.setVelocity(this.vx, -BUMP_VY);
+    b.setGravityY(0);
+    this.grounded = false;
+    this.coyote = 0;
+    this.jumpBuffer = 0;
+    this.fromWall = false;
+    this.stun = BUMP_STUN;
+    this.hero.setState('air');
+    this.hero.ouch(dir);
+    feedback.bonk();
   }
 
   private grab(side: number, wall: Solid) {

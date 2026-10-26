@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_H, GROUND_Y, WORLD_TOP, WORLD_W } from '../config/game';
+import { feedback } from '../audio/feedback';
 import { startBeat } from '../audio/music';
 import { Hero } from '../hero/Hero';
 import { HeroController } from '../hero/HeroController';
@@ -7,14 +8,18 @@ import { CombinedInput } from '../input/GameInput';
 import { KeyboardInput } from '../input/Keyboard';
 import { TouchControls } from '../input/TouchControls';
 import { Birds } from '../world/Birds';
+import type { Critter, CritterEnv } from '../world/Critter';
+import { Crow } from '../world/Crow';
 import { Drone } from '../world/Drone';
 import { Flag, Lamp, addChimneySmoke, addGoldenMotes } from '../world/Ambient';
 import { Dust, Sparks, makeFxTextures } from '../world/fx';
 import { addGround } from '../world/Ground';
 import { Parallax } from '../world/Parallax';
+import { Pigeon } from '../world/Pigeon';
 import { addProps } from '../world/Props';
 import { addColorGrade } from '../world/Vignette';
 import { LEVEL, Level } from '../world/Level';
+import { Seagull } from '../world/Seagull';
 import { Web } from '../world/Web';
 import type { UIScene } from './UIScene';
 
@@ -33,13 +38,18 @@ const MUSIC_VOLUME = 0.4;
 const MUSIC_URL = 'assets/audio/music.ogg';
 /** С какой скорости падения приземление трясёт камеру. */
 const SHAKE_FALL_V = 1350;
+/** После толчка шалуна столько никто не толкает снова. */
+const BUMP_GRACE = 1.2;
 
 export class DemoRoom extends Phaser.Scene {
   private parallax!: Parallax;
   private birds!: Birds;
   private keys!: KeyboardInput;
   private touch!: TouchControls;
-  private drones: Drone[] = [];
+  private critters: Critter[] = [];
+  private crow!: Crow;
+  private sparks!: Sparks;
+  private bumpCd = 0;
   private web!: Web;
   private lamp!: Lamp;
   private flag!: Flag;
@@ -84,6 +94,8 @@ export class DemoRoom extends Phaser.Scene {
 
     const dust = new Dust(this);
     const sparks = new Sparks(this, glowLayer);
+    this.sparks = sparks;
+    this.bumpCd = 0;
     this.keys = new KeyboardInput(this);
     this.touch = new TouchControls(this.input.manager);
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) => this.touch.onPointerDown(p));
@@ -91,10 +103,17 @@ export class DemoRoom extends Phaser.Scene {
     this.hero = new Hero(this, LEVEL.start.x, LEVEL.start.y, dust);
     this.controller = new HeroController(this, this.hero, input, this.level, dust);
 
-    const floorAt = (x: number, y: number) => this.level.floorAt(x, y);
-    this.drones = LEVEL.drones.map((d) => new Drone(this, d.x, d.y, sparks, floorAt));
+    // шалуны: дроны-мишени, бойкий дрон-2, голуби, чайка и Ворон с носком
+    const env: CritterEnv = { sparks, floorAt: (x, y) => this.level.floorAt(x, y), hero: this.hero };
+    this.critters = [
+      ...LEVEL.drones.map((d) => new Drone(this, d.x, d.y, env)),
+      ...LEVEL.drones2.map((d) => new Drone(this, d.x, d.y, env, 'drone2')),
+      ...LEVEL.pigeons.map((p) => new Pigeon(this, p.x, p.floorY, p.minX, p.maxX, env)),
+      ...LEVEL.seagulls.map((g) => new Seagull(this, g.x, g.y, g.range, env)),
+    ];
+    this.crow = new Crow(this, LEVEL.crowPerches, env, glowLayer);
     this.web = new Web(this, sparks, this.level.webTargets, glowLayer);
-    this.controller.onShoot = (from, facing) => this.web.fire(from, facing, this.drones);
+    this.controller.onShoot = (from, facing) => this.web.fire(from, facing, [...this.critters, this.crow]);
     this.controller.onLand = (v) => {
       if (v > SHAKE_FALL_V) this.cameras.main.shake(150, 0.0035 * Math.min(2, v / SHAKE_FALL_V));
     };
@@ -169,14 +188,49 @@ export class DemoRoom extends Phaser.Scene {
     // ввод → физика и позиция героя (в одном месте) → всё остальное; камера следует уже за итогом
     this.touch.update();
     this.controller.update(dt);
-    for (const d of this.drones) d.update(dt);
-    this.drones = this.drones.filter((d) => d.state !== 'gone');
+    for (const c of this.critters) c.update(dt);
+    this.critters = this.critters.filter((c) => c.state !== 'gone');
+    this.crow.update(dt);
+    this.checkBumps(dt);
+    if (this.crow.takeSock(this.controller.body)) this.celebrate();
     this.web.update(dt);
     this.lamp.update(dt);
     this.flag.update(dt);
     this.birds.update(dt);
     this.updateCamera(Math.min(deltaMs / 1000, 0.1));
     this.parallax.update(dt);
+  }
+
+  /** Шалун коснулся героя — мягкий толчок прочь от него (без урона). */
+  private checkBumps(dt: number) {
+    this.bumpCd = Math.max(0, this.bumpCd - dt);
+    if (this.bumpCd > 0) return;
+    const b = this.controller.body;
+    for (const c of this.critters) {
+      const r = c.hurtRadius;
+      if (!c.alive || r === 0) continue;
+      const nx = Phaser.Math.Clamp(c.x, b.left, b.right);
+      const ny = Phaser.Math.Clamp(c.y, b.top, b.bottom);
+      if (Math.hypot(c.x - nx, c.y - ny) > r) continue;
+      this.controller.bump(Math.sign(b.center.x - c.x) || -this.hero.facing);
+      c.bumped();
+      this.sparks.burst(nx, ny, 8);
+      this.cameras.main.shake(120, 0.003);
+      this.bumpCd = BUMP_GRACE;
+      return;
+    }
+  }
+
+  /** Носок найден — победа: «дзынь» вверх, герой подпрыгивает от радости, искры волнами. */
+  private celebrate() {
+    feedback.win();
+    this.hero.kick(0.2);
+    for (let i = 0; i < 4; i++) {
+      this.time.delayedCall(i * 160, () => {
+        const a = Math.random() * Math.PI * 2;
+        this.sparks.burst(this.hero.x + Math.cos(a) * 90, this.hero.y - 140 + Math.sin(a) * 60, 22);
+      });
+    }
   }
 
   private updateCamera(dt: number) {
