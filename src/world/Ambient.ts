@@ -100,15 +100,29 @@ export class Lamp {
   }
 }
 
+/** Тон спущенного (ещё не взятого) флага и тон после подъёма (как общий тёплый тон сцены). */
+const FLAG_OFF = 0x7a6a8a;
+const FLAG_ON = 0xffeedd;
+/** Насколько спущено полотнище у не взятого флага. */
+const FLAG_LOWER = 120;
+
 /**
  * Флаг-чекпоинт: полотнище нарезано на вертикальные полоски, каждая смещается
  * по синусу — волна бежит от древка, у древка полотно неподвижно.
+ * Пока герой не добежал — спущен и серый; добежал — взлетает вверх и вспыхивает цветом.
  */
 export class Flag {
+  active = false;
   private strips: { img: Phaser.GameObjects.Image; k: number; baseY: number }[] = [];
   private t = 0;
+  private lower = FLAG_LOWER;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(
+    private scene: Phaser.Scene,
+    readonly x: number,
+    y: number,
+    active = false,
+  ) {
     // checkpoint_flag.png 240×367: древко с шаром x < 72, полотно x 66..236, y 50..212
     const W = 240;
     const H = 367;
@@ -131,13 +145,26 @@ export class Flag {
         .setCrop(Math.floor(cx), 44, Math.ceil(sw) + 1, 172);
       this.strips.push({ img, k: (i + 1) / n, baseY: top });
     }
+    this.active = active;
+    this.lower = active ? 0 : FLAG_LOWER;
+    for (const s of this.strips) s.img.setTint(active ? FLAG_ON : FLAG_OFF);
+  }
+
+  /** Герой добежал: полотнище взлетает вверх и загорается цветом. */
+  activate() {
+    if (this.active) return;
+    this.active = true;
+    this.scene.tweens.add({ targets: this, lower: 0, duration: 520, ease: 'Back.Out' });
+    for (const s of this.strips) s.img.setTint(FLAG_ON);
   }
 
   update(dt: number) {
     this.t += dt;
+    // спущенный флаг почти не колышется
+    const amp = this.active ? 1 : 0.3;
     for (const s of this.strips) {
       const wave = Math.sin(this.t * 5 - s.k * 5.5) * 7 * s.k + Math.sin(this.t * 2.3 - s.k * 3) * 3 * s.k;
-      s.img.y = s.baseY + wave;
+      s.img.y = s.baseY + this.lower + wave * amp;
     }
   }
 }

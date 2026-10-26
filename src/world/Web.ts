@@ -47,6 +47,10 @@ export class Web {
   private shots: Shot[] = [];
   private splats: Splat[] = [];
   private t = 0;
+  /** нить качелей от руки к крюку; null — не качаемся */
+  rope: { x1: number; y1: number; x2: number; y2: number } | null = null;
+  /** попали в шалуна — для замедления времени */
+  onHit: () => void = () => {};
 
   /** onFire — для вспышки у героя. Всё светящееся живёт в glowLayer (один проход bloom). */
   constructor(
@@ -104,6 +108,7 @@ export class Web {
         if (d < HIT_R + SPEED * dt) {
           s.target.hit();
           feedback.hit();
+          this.onHit();
           this.splat(s.target.x, s.target.y, 46, 0.35);
           this.sparks.burst(s.target.x, s.target.y, 14);
           this.scene.cameras.main.shake(140, 0.004);
@@ -161,6 +166,7 @@ export class Web {
   private draw() {
     const g = this.g;
     g.clear();
+    if (this.rope) this.drawRope(this.rope);
     for (const s of this.shots) {
       this.drawTrail(s);
       this.drawBall(s.x, s.y, 11, s.age * 14);
@@ -189,6 +195,28 @@ export class Web {
         g.lineStyle(1.5 + k * 1.5, 0xf4fffd, 0.15 + 0.8 * k);
         g.lineBetween(a.x + nx * w0, a.y + ny * w0, b.x + nx * w1, b.y + ny * w1);
       }
+    }
+  }
+
+  /** Нить качелей: две светящиеся пряди, чуть дрожат и переплетаются. */
+  private drawRope(r: { x1: number; y1: number; x2: number; y2: number }) {
+    const g = this.g;
+    const n = 14;
+    const nx = -(r.y2 - r.y1);
+    const ny = r.x2 - r.x1;
+    const len = Math.hypot(nx, ny) || 1;
+    for (const strand of [1, -1]) {
+      g.lineStyle(strand > 0 ? 3 : 2, 0xf4fffd, strand > 0 ? 0.95 : 0.6);
+      g.beginPath();
+      for (let i = 0; i <= n; i++) {
+        const k = i / n;
+        const w = strand * Math.sin(this.t * 20 + k * 9) * 2.5 * Math.sin(k * Math.PI);
+        const x = r.x1 + (r.x2 - r.x1) * k + (nx / len) * w;
+        const y = r.y1 + (r.y2 - r.y1) * k + (ny / len) * w;
+        if (i === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.strokePath();
     }
   }
 

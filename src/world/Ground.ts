@@ -1,16 +1,18 @@
 import Phaser from 'phaser';
-import { GAME_H, GROUND_Y, WORLD_W } from '../config/game';
+import { GAME_H, GROUND_Y } from '../config/game';
 import { addTiled } from './textures';
 
 const FACADE_KEY = 'facade_shade';
 
 /**
- * Крыша по всей длине уровня: каменный карниз и кирпичный фасад под ним.
+ * Кусок крыши от x0 до x1: каменный карниз и кирпичный фасад под ним.
  * Фасад уходит в тёмно-фиолетовый градиент — читается как крыша, а не стена.
+ * Между кусками — улица (Platforms.addStreet).
  */
-export function addGround(scene: Phaser.Scene) {
+export function addGround(scene: Phaser.Scene, x0: number, x1: number) {
   const h = GAME_H - GROUND_Y + 40;
-  addTiled(scene, 0, GROUND_Y, WORLD_W, h, 'tex_brick', 0.5);
+  const w = x1 - x0;
+  addTiled(scene, x0, GROUND_Y, w, h, 'tex_brick', 0.5);
 
   if (!scene.textures.exists(FACADE_KEY)) {
     const t = scene.textures.createCanvas(FACADE_KEY, 4, 256)!;
@@ -23,9 +25,9 @@ export function addGround(scene: Phaser.Scene) {
     ctx.fillRect(0, 0, 4, 256);
     t.refresh();
   }
-  scene.add.image(0, GROUND_Y, FACADE_KEY).setOrigin(0, 0).setDisplaySize(WORLD_W, h);
+  scene.add.image(x0, GROUND_Y, FACADE_KEY).setOrigin(0, 0).setDisplaySize(w, h);
 
   // карниз чуть выступает над крышей; его верх — уровень, где стоит герой
   const edgeH = 148 * 0.5;
-  addTiled(scene, 0, GROUND_Y - edgeH * 0.35, WORLD_W, edgeH, 'roof_edge', 0.5);
+  addTiled(scene, x0, GROUND_Y - edgeH * 0.35, w, edgeH, 'roof_edge', 0.5);
 }

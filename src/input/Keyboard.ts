@@ -9,7 +9,7 @@ type Action = 'jump' | 'shoot' | 'debug';
  * Phaser сбрасывает JustDown и короткое нажатие терялось бы.
  */
 export class KeyboardInput implements GameInput {
-  private keys: Record<'left' | 'right' | 'up' | 'jump', Phaser.Input.Keyboard.Key>;
+  private keys: Record<'left' | 'right' | 'up' | 'jump' | 'shoot', Phaser.Input.Keyboard.Key>;
   private pressed = new Set<Action>();
 
   constructor(scene: Phaser.Scene) {
@@ -20,6 +20,7 @@ export class KeyboardInput implements GameInput {
       right: kb.addKey(K.RIGHT),
       up: kb.addKey(K.UP),
       jump: kb.addKey(K.SPACE),
+      shoot: kb.addKey(K.X),
     };
     kb.on('keydown-SPACE', (e: KeyboardEvent) => !e.repeat && this.pressed.add('jump'));
     kb.on('keydown-X', (e: KeyboardEvent) => !e.repeat && this.pressed.add('shoot'));
@@ -35,6 +36,7 @@ export class KeyboardInput implements GameInput {
   get right() { return this.keys.right.isDown; }
   get up() { return this.keys.up.isDown; }
   get jumpHeld() { return this.keys.jump.isDown; }
+  get shootHeld() { return this.keys.shoot.isDown; }
   get jumpPressed() { return this.take('jump'); }
   get shootPressed() { return this.take('shoot'); }
   get debugPressed() { return this.take('debug'); }

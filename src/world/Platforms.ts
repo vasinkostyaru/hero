@@ -140,14 +140,18 @@ export class Bouncer {
   readonly right: number;
   private sq = 0;
   private sqVel = 0;
+  private imgs: Phaser.GameObjects.Image[];
 
+  /** launchTo — подбросить не вверх, а к этой точке по x (тенты в улице — обратно к краю крыши). */
   constructor(
-    private img: Phaser.GameObjects.Image,
+    img: Phaser.GameObjects.Image | Phaser.GameObjects.Image[],
     top: number,
     left: number,
     right: number,
     readonly power: number,
+    readonly launchTo?: number,
   ) {
+    this.imgs = Array.isArray(img) ? img : [img];
     this.top = top;
     this.left = left;
     this.right = right;
@@ -167,7 +171,7 @@ export class Bouncer {
   update(dt: number) {
     this.sqVel += (-520 * this.sq - 12 * this.sqVel) * dt;
     this.sq += this.sqVel * dt;
-    this.img.setScale(1 - this.sq * 0.25, 1 + this.sq);
+    for (const img of this.imgs) img.setScale(1 - this.sq * 0.25, 1 + this.sq);
   }
 }
 
@@ -193,10 +197,41 @@ export function addAwning(scene: Phaser.Scene, wallRight: number, y: number) {
   return new Bouncer(img, y + AWNING_STAND, wallRight + 30, wallRight + img.width - 10, 1900);
 }
 
+/**
+ * Улица между домами: внизу ряд тентов на всю ширину. Упал — тент подбрасывает
+ * обратно на край крыши, с которой прыгал (GAME.md: сразу пробовать снова, без флага).
+ */
+export function addStreet(scene: Phaser.Scene, x0: number, x1: number, groundY: number, bottom: number) {
+  const g = scene.add.graphics().setDepth(-3);
+  // провал: тёмная улица вглубь, по бокам — стены домов
+  g.fillGradientStyle(0x2a1638, 0x2a1638, 0x120818, 0x120818, 1).fillRect(x0, groundY - 4, x1 - x0, bottom - groundY + 8);
+  g.fillStyle(0x1c0c2a, 1).fillRect(x0 - 4, groundY - 4, 10, bottom - groundY + 8).fillRect(x1 - 6, groundY - 4, 10, bottom - groundY + 8);
+  // тёплые окна напротив, вглубине улицы
+  for (let wx = x0 + 60; wx < x1 - 60; wx += 120) {
+    g.fillStyle(0xffc871, 0.35).fillRect(wx, groundY + 50, 26, 34);
+  }
+  const key = scaledTexture(scene, 'awning', AWNING_SCALE);
+  const imgs: Phaser.GameObjects.Image[] = [];
+  const top = bottom - 70;
+  for (let x = x0 + 10; x < x1 - 40; x += 230) {
+    const img = scene.add.image(x, top - AWNING_STAND, key).setOrigin(0, 1).setDepth(6);
+    img.setY(top - AWNING_STAND + img.height);
+    imgs.push(img);
+  }
+  return new Bouncer(imgs, top, x0 + 10, x1 - 10, 1900, x0 - 90);
+}
+
 /** Тележка с крюком катается по балке туда-обратно (пока украшение; потом — крюк, за который цепляться). */
 export class Trolley {
   private img: Phaser.GameObjects.Image;
   private t = Math.random() * 10;
+
+  /** Кончик крюка в мире — на нём может висеть предмет. */
+  hookPoint() {
+    const r = this.img.rotation;
+    // крюк на картинке — около (−8, 125) от верха по центру; поворачивается вместе с тележкой
+    return { x: this.img.x - 8 * Math.cos(r) - 125 * Math.sin(r), y: this.img.y + 125 * Math.cos(r) - 8 * Math.sin(r) };
+  }
 
   constructor(
     scene: Phaser.Scene,

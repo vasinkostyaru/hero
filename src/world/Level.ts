@@ -1,6 +1,16 @@
 import Phaser from 'phaser';
-import { GROUND_Y, WORLD_W } from '../config/game';
-import { Bouncer, Cradle, POST_COLOR, Trolley, addAwning, addClothesline, addLongPlatform, meta, type PlatformLook } from './Platforms';
+import { GAME_H, GROUND_Y } from '../config/game';
+import type { LevelDef, SectionDef } from '../levels/types';
+import { Flag, Lamp, addChimneySmoke } from './Ambient';
+import type { Critter, CritterEnv } from './Critter';
+import { Drone } from './Drone';
+import { addGround } from './Ground';
+import { Hook } from './Hook';
+import { Item } from './Item';
+import { Pigeon } from './Pigeon';
+import { Bouncer, Cradle, POST_COLOR, Trolley, addAwning, addClothesline, addLongPlatform, addStreet, meta, type PlatformLook } from './Platforms';
+import { addProps } from './Props';
+import { Seagull } from './Seagull';
 import { addTiled, scaledTexture } from './textures';
 
 export type SolidKind = 'roof' | 'platform' | 'wall' | 'box';
@@ -18,107 +28,235 @@ export interface Solid {
   look?: PlatformLook | 'balcony';
 }
 
-const PLATFORM_H = 64;
 /** Платформы из набора — перед декором крыши (6), но за героем и шалунами. */
 const PLATFORM_DEPTH = 7;
-/** ширина картинки балкона в атласе platforms */
-const BALCONY_W = 208;
 /** Тон кирпича под палитру заката: чуть темнее и в сиреневый, как всё, что стоит в тени. */
 const BRICK_TINT = 0xd9c6d6;
 const RIM_COLOR = 0xffb46a;
 const OUTLINE = 0x1c0c2a;
 /** Ящик по пояс герою: crate.png (265 px) × 0.42 ≈ 110 px. */
 const CRATE_SCALE = 0.42;
+/** Секции дальше этого от края экрана не рисуются и не обновляются. */
+const CULL_MARGIN = 700;
+
+/** Насест злодея в мировых координатах. */
+export interface Perch {
+  x: number;
+  y: number;
+  drop?: string;
+}
+
+interface Updatable {
+  update(dt: number): void;
+}
+
+/** Секция в мире: её объекты (для отключения отрисовки) и всё, что обновляется. */
+interface Section {
+  x0: number;
+  x1: number;
+  objects: Phaser.GameObjects.GameObject[];
+  updaters: Updatable[];
+  critters: Critter[];
+  near: boolean;
+}
 
 /**
- * Демо-комната (≈2.5 экрана): крыша по всей длине, ящик-ступенька, мостик из досок,
- * балкон у высокой стены с плющом, балка с тележкой, леса, люлька и узкий колодец
- * из двух стен для прыжков от стены к стене. Бельё у старта и тент на колодце — батуты.
- */
-const SOLIDS: Solid[] = [
-  { x: 0, y: GROUND_Y, w: WORLD_W, h: 400, kind: 'roof' },
-  { x: 860, y: GROUND_Y - 110, w: 120, h: 110, kind: 'box' },
-  { x: 1100, y: GROUND_Y - 190, w: 300, h: PLATFORM_H, kind: 'platform', look: 'wood' },
-  // балкон прижат к стене слева: правый (отрезанный) край картинки — у стены
-  { x: 1650 - BALCONY_W, y: GROUND_Y - 300, w: BALCONY_W - 8, h: PLATFORM_H, kind: 'platform', look: 'balcony' },
-  { x: 1650, y: GROUND_Y - 575, w: 110, h: 575, kind: 'wall', climbable: true },
-  { x: 1900, y: GROUND_Y - 425, w: 350, h: PLATFORM_H, kind: 'platform', look: 'beam' },
-  { x: 2550, y: GROUND_Y - 215, w: 300, h: PLATFORM_H, kind: 'platform', look: 'scaffold' },
-  // колодец: щель 170 px между стенами — прыгать от одной к другой
-  { x: 3250, y: GROUND_Y - 615, w: 90, h: 615, kind: 'wall', climbable: true },
-  { x: 3510, y: GROUND_Y - 545, w: 90, h: 545, kind: 'wall', climbable: true },
-];
-
-export const LEVEL = {
-  start: { x: 500, y: GROUND_Y },
-  drones: [
-    { x: 2080, y: GROUND_Y - 590 },
-    { x: 2700, y: GROUND_Y - 420 },
-    { x: 3950, y: GROUND_Y - 360 },
-  ],
-  /** бойкий дрон-2: таранит героя */
-  drones2: [{ x: 1250, y: GROUND_Y - 470 }],
-  /** голуби ходят по своей дорожке: по крыше под первой платформой и по третьей платформе */
-  pigeons: [
-    { x: 1300, floorY: GROUND_Y, minX: 1030, maxX: 1580 },
-    { x: 2700, floorY: GROUND_Y - 215, minX: 2585, maxX: 2815 },
-  ],
-  seagulls: [{ x: 2900, y: GROUND_Y - 760, range: 380 }],
-  /** насесты Ворона (точка у лап): верх правой стены колодца, крыша у фонаря, вторая платформа */
-  crowPerches: [
-    { x: 3555, y: GROUND_Y - 545 },
-    { x: 4280, y: GROUND_Y },
-    { x: 2075, y: GROUND_Y - 425 },
-  ],
-  lampX: 4020,
-  flagX: 4460,
-  /** люлька: x — левый край, top/bottom — крайние линии пола, period — полный круг, с */
-  cradles: [{ x: 2930, top: GROUND_Y - 520, bottom: GROUND_Y - 40, period: 7 }],
-  clotheslines: [{ x: 560 }],
-  /** тент на правом боку правой стены колодца: подбрасывает к её верху */
-  awnings: [{ wallRight: 3600, y: GROUND_Y - 270 }],
-  /** тележка с крюком под балкой (вторая платформа) */
-  trolleys: [{ minX: 1980, maxX: 2200, beamTop: GROUND_Y - 425 - 5 }],
-};
-
-/**
- * Уровень: рисует платформы/стены/ящик и создаёт статические тела Arcade.
- * Платформы — «односторонние»: снизу сквозь них можно запрыгнуть, сверху стоишь.
+ * Уровень из секций (LevelDef): крыша кусками с улицами между ними, платформы и стены
+ * (статические тела Arcade; платформы — односторонние), декор, флаги-чекпоинты, крюки,
+ * батуты, люльки, тележки, шалуны и предметы. Объекты каждой секции запоминаются:
+ * секции далеко за экраном не рисуются (cameraFilter) и не обновляются.
  */
 export class Level {
-  readonly solids: Solid[] = SOLIDS.map((s) => ({ ...s }));
+  readonly width: number;
+  readonly startX: number;
+  readonly solids: Solid[] = [];
   readonly bodies: Phaser.Physics.Arcade.StaticBody[] = [];
   readonly bouncers: Bouncer[] = [];
+  readonly hooks: Hook[] = [];
+  readonly items: Item[] = [];
+  readonly critters: Critter[] = [];
+  readonly flags: Flag[] = [];
+  readonly perches: Perch[] = [];
+  private sections: Section[] = [];
   private cradles: { cradle: Cradle; solid: Solid }[] = [];
-  private trolleys: Trolley[] = [];
+  private trolleys = new Map<string, Trolley>();
+  private byId = new Map<string, Critter>();
 
-  constructor(private scene: Phaser.Scene) {
+  constructor(
+    private scene: Phaser.Scene,
+    def: LevelDef,
+    private env: CritterEnv,
+    private glowLayer: Phaser.GameObjects.Layer,
+  ) {
     makeShadeTextures(scene);
-    for (const s of this.solids) {
-      this.draw(s);
-      const body = scene.physics.add.staticBody(s.x, s.y, s.w, s.h);
-      if (s.kind === 'platform') {
-        body.checkCollision.down = false;
-        body.checkCollision.left = false;
-        body.checkCollision.right = false;
-      }
-      this.bodies.push(body);
+    let x0 = 0;
+    let start = 0;
+    for (const sd of def.sections) {
+      if (sd.start !== undefined) start = x0 + sd.start;
+      this.sections.push(this.buildSection(sd, x0));
+      x0 += sd.w;
     }
-    for (const c of LEVEL.cradles) {
-      const cradle = new Cradle(scene, c.x, c.top, c.bottom, c.period);
+    this.width = x0;
+    this.startX = start;
+    this.buildItems(def);
+  }
+
+  /** Строит секцию и запоминает всё, что она добавила в сцену и в слой свечения. */
+  private buildSection(sd: SectionDef, x0: number): Section {
+    const scene = this.scene;
+    const before = new Set(scene.children.list);
+    const beforeGlow = new Set(this.glowLayer.list);
+    const sec: Section = { x0, x1: x0 + sd.w, objects: [], updaters: [], critters: [], near: true };
+    const X = (x: number) => x0 + x;
+
+    // крыша кусками, между ними — улица с тентами
+    const roof = sd.roof ?? [[0, sd.w]];
+    roof.forEach(([a, b], i) => {
+      addGround(scene, X(a), X(b));
+      this.addSolid({ x: X(a), y: GROUND_Y, w: b - a, h: 400, kind: 'roof' });
+      const next = roof[i + 1];
+      if (next) this.bouncers.push(addStreet(scene, X(b), X(next[0]), GROUND_Y, GAME_H));
+    });
+
+    for (const p of addProps(scene, (sd.props ?? []).map((p) => ({ ...p, x: X(p.x) })))) {
+      // дымок из левой трубы на шапке трубы
+      if (p.def.key === 'chimney') addChimneySmoke(scene, p.img.x - p.img.displayWidth * 0.12, p.img.y - p.img.displayHeight * 0.97, p.def.far);
+    }
+    for (const s of sd.solids ?? []) this.addSolid({ ...s, x: X(s.x) });
+
+    for (const c of sd.cradles ?? []) {
+      const cradle = new Cradle(scene, X(c.x), c.top, c.bottom, c.period);
       // пол люльки — тоже опора: для тени героя и падающих коконов
       const solid: Solid = { ...cradle.floor, h: 24, kind: 'platform' };
       this.solids.push(solid);
       this.bodies.push(cradle.body);
       this.cradles.push({ cradle, solid });
     }
-    for (const c of LEVEL.clotheslines) this.bouncers.push(addClothesline(scene, c.x, GROUND_Y));
-    for (const a of LEVEL.awnings) this.bouncers.push(addAwning(scene, a.wallRight, a.y));
-    for (const t of LEVEL.trolleys) this.trolleys.push(new Trolley(scene, t.minX, t.maxX, t.beamTop));
+    for (const c of sd.clotheslines ?? []) this.bouncers.push(addClothesline(scene, X(c.x), GROUND_Y));
+    for (const a of sd.awnings ?? []) this.bouncers.push(addAwning(scene, X(a.wallRight), a.y));
+    sd.trolleys?.forEach((t, i) => {
+      const trolley = new Trolley(scene, X(t.minX), X(t.maxX), t.beamTop);
+      this.trolleys.set(t.id ?? `${x0}:${i}`, trolley);
+      sec.updaters.push(trolley);
+    });
+    for (const h of sd.hooks ?? []) this.hooks.push(new Hook(scene, X(h.x), h.y, X(h.spanL), X(h.spanR), this.glowLayer));
+    for (const l of sd.lamps ?? []) sec.updaters.push(new Lamp(scene, X(l.x), GROUND_Y + 4, this.glowLayer));
+    if (sd.flag !== undefined) {
+      // флаг первой секции (старт) поднят сразу
+      const flag = new Flag(scene, X(sd.flag), GROUND_Y + 4, sd.start !== undefined);
+      this.flags.push(flag);
+      sec.updaters.push(flag);
+    }
+    if (sd.crow) this.perches.push({ ...sd.crow, x: X(sd.crow.x) });
+
+    for (const c of sd.critters ?? []) {
+      const critter = this.makeCritter(c, X);
+      sec.critters.push(critter);
+      this.critters.push(critter);
+      if (c.id) this.byId.set(c.id, critter);
+    }
+
+    sec.objects = scene.children.list.filter((o) => !before.has(o));
+    sec.objects.push(...this.glowLayer.list.filter((o) => !beforeGlow.has(o)));
+    this.pendingItems.push(...(sd.items ?? []).map((it) => ({ ...it, x: X(it.x), sec })));
+    return sec;
   }
 
-  /** Движущееся: люльки (и герой на них), пружинящие батуты, тележки. До шага героя. */
-  update(dt: number, hero: Phaser.Physics.Arcade.Body) {
+  private pendingItems: (NonNullable<SectionDef['items']>[number] & { sec: Section })[] = [];
+
+  /** Предметы — после всех секций: им нужны сторожа и тележки по id. */
+  private buildItems(def: LevelDef) {
+    for (const it of this.pendingItems) {
+      if (!def.items.includes(it.key)) continue;
+      const before = new Set(this.scene.children.list);
+      const beforeGlow = new Set(this.glowLayer.list);
+      const guard = it.guard ? this.byId.get(it.guard) : undefined;
+      const trolley = it.attach ? this.trolleys.get(it.attach) : undefined;
+      const item = new Item(
+        this.scene,
+        it.key,
+        it.x,
+        it.y,
+        this.glowLayer,
+        guard ? () => guard.alive : undefined,
+        // предмет висит под крюком: верх картинки — у кончика крюка
+        trolley ? () => { const p = trolley.hookPoint(); return { x: p.x, y: p.y + 30 }; } : null,
+        it.carried,
+      );
+      this.items.push(item);
+      // предмет у злодея может оказаться где угодно — его не прячем вместе с секцией
+      if (!it.carried) {
+        it.sec.objects.push(...this.scene.children.list.filter((o) => !before.has(o)));
+        it.sec.objects.push(...this.glowLayer.list.filter((o) => !beforeGlow.has(o)));
+      }
+      it.sec.updaters.push(item);
+    }
+    this.pendingItems = [];
+  }
+
+  private makeCritter(c: NonNullable<SectionDef['critters']>[number], X: (x: number) => number): Critter {
+    switch (c.kind) {
+      case 'drone':
+      case 'drone2':
+        return new Drone(this.scene, X(c.x), c.y, this.env, c.kind);
+      case 'pigeon':
+        return new Pigeon(this.scene, X(c.x), c.floorY, X(c.minX), X(c.maxX), this.env);
+      case 'seagull':
+        return new Seagull(this.scene, X(c.x), c.y, c.range, this.env);
+    }
+  }
+
+  private addSolid(s: Solid) {
+    this.draw(s);
+    const body = this.scene.physics.add.staticBody(s.x, s.y, s.w, s.h);
+    if (s.kind === 'platform') {
+      body.checkCollision.down = false;
+      body.checkCollision.left = false;
+      body.checkCollision.right = false;
+    }
+    this.solids.push(s);
+    this.bodies.push(body);
+  }
+
+  /** Активный шалун ближе всего к экрану — только из видимых секций. */
+  get activeCritters() {
+    return this.sections.filter((s) => s.near).flatMap((s) => s.critters);
+  }
+
+  /** Флаг, который герой только что пробежал (или null). */
+  passFlag(heroX: number) {
+    for (const f of this.flags) {
+      if (!f.active && heroX > f.x - 20) {
+        f.activate();
+        return f;
+      }
+    }
+    return null;
+  }
+
+  /** Крюк, до которого герой (центр тела) сейчас дотягивается. */
+  hookInReach(cx: number, cy: number) {
+    let best: Hook | null = null;
+    for (const h of this.hooks) if (h.inReach(cx, cy) && (!best || Math.abs(h.x - cx) < Math.abs(best.x - cx))) best = h;
+    return best;
+  }
+
+  /**
+   * Секции у экрана рисуются и обновляются, остальные — нет. Люльки везут героя,
+   * батуты пружинят, крюки подсвечиваются. Вызывать до шага героя.
+   */
+  update(dt: number, hero: Phaser.Physics.Arcade.Body, cam: Phaser.Cameras.Scene2D.Camera) {
+    const view = cam.worldView;
+    for (const s of this.sections) {
+      const near = s.x1 > view.left - CULL_MARGIN && s.x0 < view.right + CULL_MARGIN;
+      if (near !== s.near) {
+        s.near = near;
+        for (const o of s.objects) (o as unknown as { cameraFilter: number }).cameraFilter = near ? 0 : cam.id;
+      }
+      if (!near) continue;
+      for (const u of s.updaters) u.update(dt);
+      for (const c of s.critters) c.update(dt);
+    }
     for (const { cradle, solid } of this.cradles) {
       const f = cradle.floor;
       const riding =
@@ -134,7 +272,7 @@ export class Level {
       }
     }
     for (const b of this.bouncers) b.update(dt);
-    for (const t of this.trolleys) t.update(dt);
+    for (const h of this.hooks) h.update(dt, hero.center.x, hero.center.y);
   }
 
   /** Стены и ящик — в них прилипает паутина. */

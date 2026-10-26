@@ -61,6 +61,7 @@ export class TouchControls implements GameInput {
   get right() { return this.pressedNow.has('right'); }
   get up() { return false; }
   get jumpHeld() { return this.pressedNow.has('jump'); }
+  get shootHeld() { return this.pressedNow.has('shoot'); }
   get jumpPressed() { return this.justPressed.has('jump'); }
   get shootPressed() { return this.justPressed.has('shoot'); }
 

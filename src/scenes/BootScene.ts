@@ -19,9 +19,14 @@ export class BootScene extends Phaser.Scene {
     for (const key of ['water_tower', 'chimney', 'antenna', 'ac_unit', 'crate', 'lamp', 'checkpoint_flag', 'awning']) this.load.image(key, `world/props/${key}.png`);
     for (const key of ['drone_body', 'drone_propeller', 'drone_cocoon']) this.load.image(key, `world/drone/${key}.png`);
     for (const key of ['pigeon_cocoon', 'seagull_cocoon', 'drone2_body', 'drone2_propeller', 'drone2_cocoon']) this.load.image(key, `chars/enemies/${key}.png`);
-    for (const key of ['crow_laugh', 'crow_dizzy', 'sock']) this.load.image(key, `chars/crow/${key}.png`);
+    for (const key of ['crow_fly_1', 'crow_fly_2', 'crow_laugh', 'crow_dizzy']) this.load.image(key, `chars/crow2/${key}.png`);
+    this.load.json('crow_beak', 'chars/crow2/beak.json');
+    this.load.image('sock', 'chars/crow/sock.png');
+    for (const key of ['tshirt', 'cap', 'scarf', 'mitten', 'shorts', 'towel', 'pajamas', 'underpants']) this.load.image(key, `items/${key}.png`);
+    for (const key of ['pause', 'home', 'play', 'restart', 'star_full', 'star_empty']) {
+      this.load.image(`ui_${key}`, key.startsWith('star') ? `ui/${key}.png` : `ui/btn_${key}.png`);
+    }
     this.load.atlas('seagull', 'chars/enemies/seagull_atlas.png', 'chars/enemies/seagull_atlas.json');
-    this.load.atlas('crow', 'chars/crow/crow_atlas.png', 'chars/crow/crow_atlas.json');
     this.load.atlas('pigeon', 'chars/enemies/pigeon_atlas.png', 'chars/enemies/pigeon_atlas.json');
     this.load.atlas('platforms', 'world/platforms.png', 'world/platforms.json');
     this.load.json('platforms_meta', 'world/platforms_meta.json');
@@ -44,6 +49,6 @@ export class BootScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.fadeOut(220, 0, 0, 0);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.start('DemoRoom'));
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.start('Level'));
   }
 }

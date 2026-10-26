@@ -52,6 +52,9 @@ export class Hero {
   private sq = 0;
   private sqVel = 0;
   private lean = 0;
+  /** наклон на качелях — голова к крюку (радианы); null — не качается */
+  swingAngle: number | null = null;
+  private swingRot = 0;
   /** покачивание после толчка шалуна, градусы */
   private wob = 0;
   private wobVel = 0;
@@ -170,7 +173,9 @@ export class Hero {
 
     this.wobVel += (-160 * this.wob - 9 * this.wobVel) * dt;
     this.wob += this.wobVel * dt;
-    this.root.setScale(sx, sy).setRotation(Phaser.Math.DegToRad(this.lean * this.facing + this.wob));
+    // на качелях тело тянется вдоль нити (чуть меньше её угла — мягче)
+    this.swingRot += ((this.swingAngle ?? 0) * 0.8 - this.swingRot) * lerpK(this.swingAngle === null ? 10 : 18, dt);
+    this.root.setScale(sx, sy).setRotation(Phaser.Math.DegToRad(this.lean * this.facing + this.wob) + this.swingRot);
 
     this.speed = m.speed;
 

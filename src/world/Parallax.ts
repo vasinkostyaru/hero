@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
-import { PARALLAX, WORLD_W } from '../config/game';
+import { PARALLAX } from '../config/game';
 
 /** Насколько слои двигаются по вертикали относительно горизонтали. */
 const VERTICAL = 0.35;
 /** Небо увеличено, чтобы его хватало при отъезде камеры (zoom 0.92) и вертикальном сдвиге. */
-const SKY_MIN_SCALE = 1.16;
+const SKY_SCALE = 1.16;
 /** Облака плывут туда-обратно: центр и размах сдвига неба, px. */
 const SKY_DRIFT = 70;
 const WINDOWS_PER_HALF = 22;
@@ -24,29 +24,35 @@ interface WindowLight {
 /**
  * Фон в три слоя. Сдвиг делает сам Phaser через scrollFactor — в момент отрисовки,
  * по актуальной камере, поэтому фон не отстаёт на кадр.
- * - Небо (2527 px) — одна картинка; облака медленно плывут (сдвиг по времени).
+ * - Небо (2527 px) не тянем под длину уровня: повторяем через зеркальную копию (A | Aʹ | A …) —
+ *   шва нет, масштаб постоянный; облака медленно плывут (сдвиг по времени).
  * - Города бесшовные, но 5052 px больше лимита текстуры телефонов (4096) — разрезаны
  *   на половины _a/_b (art/split_bg.py) и собираются из картинок A B A B.
  * - Дальний город размыт заранее (canvas filter при загрузке) — во время игры ноль проходов;
  *   поверх — огоньки окон, которые иногда загораются и гаснут.
  */
 export class Parallax {
-  private sky: Phaser.GameObjects.Image;
+  private sky: Phaser.GameObjects.Image[] = [];
   private layers: { parts: Phaser.GameObjects.Image[]; factor: number; period: number }[] = [];
   private windows: WindowLight[] = [];
   private t = 0;
 
-  constructor(private scene: Phaser.Scene) {
-    // на длинных телефонах экран шире — небо масштабируем, чтобы его хватило на весь уровень
+  constructor(private scene: Phaser.Scene, worldW: number) {
+    // столько копий неба, чтобы хватило на весь уровень с отъездом камеры и дрейфом облаков
     const viewW = scene.scale.width / 0.92;
-    const need = viewW + PARALLAX.sky * Math.max(0, WORLD_W - scene.scale.width) + SKY_DRIFT * 2 + 20;
-    const skyW = scene.textures.get('sky').getSourceImage().width;
-    this.sky = scene.add
-      .image(0, -90, 'sky')
-      .setOrigin(0, 0)
-      .setScale(Math.max(SKY_MIN_SCALE, need / skyW))
-      .setScrollFactor(PARALLAX.sky, PARALLAX.sky * VERTICAL * 0.5)
-      .setDepth(-100);
+    const need = viewW + PARALLAX.sky * Math.max(0, worldW - scene.scale.width) + SKY_DRIFT * 2 + 20;
+    const skyW = scene.textures.get('sky').getSourceImage().width * SKY_SCALE;
+    for (let i = 0; i < Math.ceil(need / skyW); i++) {
+      this.sky.push(
+        scene.add
+          .image(i * skyW, -90, 'sky')
+          .setOrigin(0, 0)
+          .setScale(SKY_SCALE)
+          .setFlipX(i % 2 === 1)
+          .setScrollFactor(PARALLAX.sky, PARALLAX.sky * VERTICAL * 0.5)
+          .setDepth(-100),
+      );
+    }
 
     // лёгкое размытие дальнего города — «воздушная перспектива»
     for (const k of ['city_far_a', 'city_far_b']) blurredCopy(scene, k, 1.6);
@@ -114,7 +120,8 @@ export class Parallax {
     this.t += dt;
     const scrollX = this.scene.cameras.main.scrollX;
     // облака плывут очень медленно: туда-обратно за ~7 минут
-    this.sky.x = -(SKY_DRIFT + SKY_DRIFT * Math.sin((this.t * Math.PI * 2) / 420));
+    const drift = -(SKY_DRIFT + SKY_DRIFT * Math.sin((this.t * Math.PI * 2) / 420));
+    this.sky.forEach((sky, i) => (sky.x = drift + i * sky.displayWidth));
 
     for (const { parts, factor, period } of this.layers) {
       const base = Math.floor((scrollX * factor) / period) * period;

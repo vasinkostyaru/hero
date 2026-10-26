@@ -1,9 +1,9 @@
 """Атлас птицы из кадров, нарезанных art/sheet.py (чайка — art/raw/seagull_sheet.png,
-Ворон — art/raw/crow_fly_sheet.png). Кадры выравниваются по приметной точке головы
-(чайка — основание клюва, Ворон — стекло очков): голова на месте, машут только крылья.
+голубь — art/raw/pigeon_sheet.png). Кадры выравниваются по приметной точке: у чайки —
+основание клюва (голова на месте, машут только крылья), у голубя — лапы и линия земли.
 Кадры из CENTERED (пике) — по центру силуэта. Все кадры в холсте одного размера,
 центр холста — центр тела. Уменьшение до игрового размера здесь (Lanczos), в игре setScale(1).
-Запуск: python3 art/bird_atlas.py <проект> seagull|crow
+Запуск: python3 art/bird_atlas.py <проект> seagull|pigeon
 """
 import sys, os, json
 import numpy as np
@@ -25,28 +25,6 @@ def beak_base(a):
     return xs.min(), ys.min()
 
 
-def goggle_lens(a):
-    r, g, b, al = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
-    ys, xs = largest((al > 200) & (b > 150) & (b > r + 60) & (b > g + 20))
-    return xs.mean(), ys.mean()
-
-
-def clear_holes(img):
-    """Белый фон, запертый внутри силуэта (между крылом и носком, между лапами), — в прозрачность.
-    Только чистый белый крупными пятнами: блики на носке мельче и не такие белые."""
-    a = np.array(img).astype(np.float32)
-    mn, mx = a[..., :3].min(2), a[..., :3].max(2)
-    white = (mn >= 240) & ((mx - mn) <= 12) & (a[..., 3] > 0)
-    lab, n = ndi.label(white)
-    sizes = ndi.sum(white, lab, range(1, n + 1))
-    holes = np.isin(lab, [i + 1 for i, sz in enumerate(sizes) if sz >= 60])
-    a[..., 3][holes] = 0
-    # светлая кайма вокруг дыры — полупрозрачная по светлоте, как при вырезании фона
-    edge = ndi.binary_dilation(holes, iterations=2) & ~holes
-    a[..., 3][edge] *= np.clip(((255 - a[..., :3]) / 255).max(2) * 4, 0, 1)[edge]
-    return Image.fromarray(a.astype(np.uint8))
-
-
 def feet(a):
     """Голубь ходит: опора — линия лап (низ силуэта), по X — центр масс силуэта."""
     ys, xs = np.where(a[..., 3] > 128)
@@ -57,10 +35,6 @@ def feet(a):
 BIRDS = {
     'seagull': dict(cut='art/seagull_cut', out='public/assets/chars/enemies', scale=0.4, anchor=beak_base,
                     body=(-140, 75), frames=['fly_1', 'fly_2', 'fly_3', 'fly_4', 'glide', 'dive'], centered=['dive']),
-    # Ворон: стекло очков на листе ~30 px против 40 на crow_fly.png (в игре × 0.45) → 0.45 × 40/31
-    'crow': dict(cut='art/crow_cut', out='public/assets/chars/crow', scale=0.58, anchor=goggle_lens,
-                 body=(-110, 85), frames=['fly_1', 'fly_2', 'fly_3', 'fly_4', 'land', 'takeoff'], centered=[],
-                 holes=True),
     # голубь: глаз на листе ~9.5% крупнее, чем на pigeon.png (в игре × 0.3) → 0.3 / 1.095;
     # центр холста — 170 px листа над лапами
     'pigeon': dict(cut='art/pigeon_cut', out='public/assets/chars/enemies', scale=0.274, anchor=feet,
