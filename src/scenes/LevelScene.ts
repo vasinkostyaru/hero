@@ -143,7 +143,7 @@ export class LevelScene extends Phaser.Scene {
       onDrop: (key, x, y) => this.level.items.find((i) => i.key === key)?.drop(x, y),
       onEscape: () => this.win(),
       onBossHit: (left) => (this.scene.get('UI') as UIScene).bossHit(left),
-      onSummon: () => this.summonPigeons(env),
+      onSummon: (wave) => this.summonWave(wave),
       onDefeat: (x, y) => this.bossDefeated(x, y, bossItems),
     });
     this.crow.prewarm(this.def.items);
@@ -223,14 +223,23 @@ export class LevelScene extends Phaser.Scene {
     feedback.caw(0.9);
   }
 
-  /** Фаза 2: Ворон зовёт голубей — они падают с неба на крышу арены. */
-  private summonPigeons(env: CritterEnv) {
-    for (const x of this.level.arena!.pigeons) {
-      const p = new Pigeon(this, x, GROUND_Y, x - 280, x + 280, env);
-      const y = p.root.y;
-      p.root.y = WORLD_TOP;
-      this.tweens.add({ targets: p.root, y, duration: PIGEON_FALL_MS, ease: 'Bounce.Out', onComplete: () => this.sparks.burst(x, GROUND_Y - 10, 8) });
-      this.helpers.push(p);
+  /**
+   * Ворон зовёт волну шалунов: голуби падают с неба на крышу арены, дроны и чайки
+   * появляются из облачка искр. Пока волна не в коконах — Ворон под щитом.
+   */
+  private summonWave(wave: number) {
+    const arena = this.level.arena!;
+    for (const def of arena.waves[wave] ?? []) {
+      const c = this.level.spawnCritter(def, arena.x);
+      if (c instanceof Pigeon) {
+        const y = c.root.y;
+        c.root.y = WORLD_TOP;
+        this.tweens.add({ targets: c.root, y, duration: PIGEON_FALL_MS, ease: 'Bounce.Out', onComplete: () => this.sparks.burst(c.x, GROUND_Y - 10, 8) });
+      } else {
+        c.root.setScale(0);
+        this.tweens.add({ targets: c.root, scale: 1, duration: 420, ease: 'Back.Out', onStart: () => this.sparks.burst(c.x, c.y, 14) });
+      }
+      this.helpers.push(c);
     }
   }
 

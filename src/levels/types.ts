@@ -41,9 +41,9 @@ export interface SectionDef {
   slot?: string;
   /**
    * Арена битвы с боссом (уровень 3 мира): злодей прилетает сюда, когда герой вошёл в секцию.
-   * perches — насесты, pigeons — x, где приземляются голуби, которых он зовёт на помощь.
+   * perches — насесты; waves — волны шалунов, которых он зовёт (пока волна не в коконах — он под щитом).
    */
-  arena?: { perches: { x: number; y: number }[]; pigeons: number[] };
+  arena?: { perches: { x: number; y: number }[]; waves: CritterDef[][] };
 }
 
 export interface SolidDef {

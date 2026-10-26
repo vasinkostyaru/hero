@@ -18,7 +18,11 @@ const CARRY_SIZE = 70;
 /** Босс (уровень 3): столько попаданий, чтобы он выронил последние вещи. */
 export const BOSS_HITS = 10;
 /** После стольких попаданий зовёт голубей на помощь (фаза 2), потом пикирует (фаза 3). */
-const SUMMON_AT = 3;
+const SUMMON_AT = [0, 3, 6];
+/** После попадания столько неуязвим: очередью паутины босса не взять. */
+const HURT_CD = 1.1;
+/** Фаза пике — после последней волны. */
+const DIVE_FROM = 6;
 /** Фаза 3: пауза на насесте между пике, с. */
 const DIVE_PAUSE: [number, number] = [1.4, 2.2];
 const DIVE_T = 1.3;
@@ -37,8 +41,8 @@ type CrowState = 'perch' | 'fly' | 'dive' | 'tease' | 'escape' | 'gone' | 'dizzy
 export interface CrowOptions {
   /** босс: попал — осталось столько попаданий */
   onBossHit?: (left: number) => void;
-  /** босс зовёт голубей на помощь; пока они не в коконах — сам неуязвим (unshield) */
-  onSummon?: () => void;
+  /** босс зовёт волну шалунов (номер волны); пока они не в коконах — сам под щитом (unshield) */
+  onSummon?: (wave: number) => void;
   /** босс повержен: упал в (x, y) — выронил последние вещи */
   onDefeat?: (x: number, y: number) => void;
   /** вещи уровня по порядку: несёт следующую, роняет над её местом (или улетая с насеста) */
@@ -94,6 +98,9 @@ export class Crow implements WebTarget {
   private boss = false;
   /** зовёт голубей — пока они не в коконах, паутина его не берёт */
   private shield = false;
+  /** после попадания — неуязвим ещё столько */
+  private hurtCd = 0;
+  private shieldG: Phaser.GameObjects.Graphics;
   private diveIn = 0;
   private perch = 0;
   private hits = 0;
@@ -128,7 +135,8 @@ export class Crow implements WebTarget {
     this.carry = scene.add.image(BEAK.x, BEAK.y, 'sock').setOrigin(0.5, 0.15).setVisible(false);
     this.dizzy = scene.add.image(0, 0, scaledTexture(scene, 'crow_dizzy', DIZZY_SCALE)).setOrigin(0.5, 1).setVisible(false);
     this.stars = scene.add.graphics();
-    this.root = scene.add.container(p.x, p.y, [this.laugh, this.fly, this.carry, this.dizzy, this.stars]).setDepth(8);
+    this.shieldG = scene.add.graphics();
+    this.root = scene.add.container(p.x, p.y, [this.laugh, this.fly, this.carry, this.dizzy, this.stars, this.shieldG]).setDepth(8);
     this.setCarry();
   }
 
@@ -194,7 +202,9 @@ export class Crow implements WebTarget {
   }
 
   get alive() {
-    return (this.state === 'perch' || this.state === 'fly' || this.state === 'dive') && !this.shield;
+    if (!this.boss) return this.state === 'perch' || this.state === 'fly';
+    // босса ловим, только когда сидит или пикирует, без щита и не сразу после попадания
+    return (this.state === 'perch' || this.state === 'dive') && !this.shield && this.hurtCd <= 0;
   }
 
   /** Пикирует на героя — касание толкает (как шалун). */
@@ -212,12 +222,22 @@ export class Crow implements WebTarget {
     this.hits = 0;
     this.setCarry(carryKey);
     this.flyTo(0, perches[0]);
+    this.summon(0);
   }
 
-  /** Голуби, которых он позвал, в коконах — снова можно попасть. */
+  /** Зовёт волну шалунов и прячется под щит, пока их не переловят. */
+  private summon(wave: number) {
+    this.shield = true;
+    this.opts.onSummon?.(wave);
+    if (this.state === 'perch') this.laughNow();
+  }
+
+  /** Волна, которую он позвал, в коконах — щит лопается, снова можно попасть. */
   unshield() {
     if (!this.shield) return;
     this.shield = false;
+    this.env.sparks.burst(this.x, this.y, 24);
+    this.kick(-0.2);
     this.diveIn = 0.8;
     feedback.caw(0.8);
   }
@@ -249,11 +269,11 @@ export class Crow implements WebTarget {
       return;
     }
     feedback.caw(0.85);
-    if (this.hits === SUMMON_AT) {
-      // фаза 2: зовёт голубей и хохочет, пока они не в коконах
-      this.shield = true;
-      this.opts.onSummon?.();
-      if (this.state === 'perch') this.laughNow();
+    this.hurtCd = HURT_CD;
+    const wave = SUMMON_AT.indexOf(this.hits);
+    if (wave > 0) {
+      // новая волна: зовёт шалунов и хохочет под щитом
+      this.summon(wave);
       return;
     }
     // обиделся — улетает на другой насест (в полёте или пике просто летит дальше)
@@ -279,6 +299,8 @@ export class Crow implements WebTarget {
   update(dt: number) {
     this.t += dt;
     this.stateT += dt;
+    this.hurtCd = Math.max(0, this.hurtCd - dt);
+    this.drawShield();
     switch (this.state) {
       case 'perch':
         this.perched(dt);
@@ -325,7 +347,7 @@ export class Crow implements WebTarget {
     }
 
     if (this.hold || this.atLastPerch) return;
-    if (this.boss && this.hits > SUMMON_AT && !this.shield) {
+    if (this.boss && this.hits >= DIVE_FROM && !this.shield) {
       // фаза 3: посидел — пикирует на героя
       this.diveIn -= dt;
       if (this.diveIn <= 0) {
@@ -510,6 +532,17 @@ export class Crow implements WebTarget {
       const y = DIZZY_HEAD.y + Math.sin(a) * 12;
       drawStar(g, x, y, 7 + 4 * depth, this.t * 3 + i, 0.55 + 0.45 * depth);
     }
+  }
+
+  /** Щит босса: мерцающий бирюзовый пузырь — паутина его не берёт. */
+  private drawShield() {
+    const g = this.shieldG;
+    g.clear();
+    if (!this.shield || this.state === 'dizzy') return;
+    const r = 120 + 6 * Math.sin(this.t * 5);
+    g.fillStyle(0x5ff5e6, 0.12).fillCircle(0, -100, r);
+    g.lineStyle(4, 0xbffcf4, 0.55 + 0.25 * Math.sin(this.t * 7)).strokeCircle(0, -100, r);
+    g.lineStyle(2, 0xffffff, 0.35).beginPath().arc(0, -100, r - 14, -2.4 + this.t, -1.4 + this.t).strokePath();
   }
 
   private kick(amount: number) {

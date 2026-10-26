@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_H, GROUND_Y } from '../config/game';
-import type { LevelDef, SectionDef } from '../levels/types';
+import type { CritterDef, LevelDef, SectionDef } from '../levels/types';
 import { Flag, Lamp, addChimneySmoke } from './Ambient';
 import type { Critter, CritterEnv } from './Critter';
 import { Drone } from './Drone';
@@ -78,7 +78,7 @@ export class Level {
   readonly flags: Flag[] = [];
   readonly perches: Perch[] = [];
   /** арена босса: где начинается, насесты, где приземляются голуби (мировые координаты) */
-  arena: { x: number; perches: Perch[]; pigeons: number[] } | null = null;
+  arena: { x: number; perches: Perch[]; waves: CritterDef[][] } | null = null;
   private sections: Section[] = [];
   private cradles: { cradle: Cradle; solid: Solid }[] = [];
   private trolleys = new Map<string, Trolley>();
@@ -152,7 +152,7 @@ export class Level {
       sec.updaters.push(flag);
     }
     if (sd.crow) this.perches.push({ ...sd.crow, x: X(sd.crow.x) });
-    if (sd.arena) this.arena = { x: x0, perches: sd.arena.perches.map((p) => ({ ...p, x: X(p.x) })), pigeons: sd.arena.pigeons.map(X) };
+    if (sd.arena) this.arena = { x: x0, perches: sd.arena.perches.map((p) => ({ ...p, x: X(p.x) })), waves: sd.arena.waves };
 
     for (const c of sd.critters ?? []) {
       const critter = this.makeCritter(c, X);
@@ -196,6 +196,11 @@ export class Level {
       }
     }
     this.pendingItems = [];
+  }
+
+  /** Шалун по описанию; x в описании — от x0 (для волн босса — от начала арены). */
+  spawnCritter(c: CritterDef, x0: number) {
+    return this.makeCritter(c, (x) => x0 + x);
   }
 
   private makeCritter(c: NonNullable<SectionDef['critters']>[number], X: (x: number) => number): Critter {
