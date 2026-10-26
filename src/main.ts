@@ -3,6 +3,7 @@ import { unlockAudio } from './audio/feedback';
 import { GAME_H, GAME_W } from './config/game';
 import { BootScene } from './scenes/BootScene';
 import { LevelScene } from './scenes/LevelScene';
+import { MapScene } from './scenes/MapScene';
 import { UIScene } from './scenes/UIScene';
 
 const game = new Phaser.Game({
@@ -27,7 +28,7 @@ const game = new Phaser.Game({
     default: 'arcade',
     arcade: { gravity: { x: 0, y: 2600 }, debug: false },
   },
-  scene: [BootScene, LevelScene, UIScene],
+  scene: [BootScene, MapScene, LevelScene, UIScene],
 });
 
 // Для Playwright-скриншотов и отладки из консоли

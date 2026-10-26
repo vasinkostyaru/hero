@@ -7,15 +7,17 @@ import { HeroController } from '../hero/HeroController';
 import { CombinedInput } from '../input/GameInput';
 import { KeyboardInput } from '../input/Keyboard';
 import { TouchControls } from '../input/TouchControls';
-import { LEVEL1 } from '../levels/level1';
+import { LEVELS } from '../levels';
 import type { LevelDef } from '../levels/types';
+import { progress } from '../progress';
 import { Birds } from '../world/Birds';
 import { addGoldenMotes } from '../world/Ambient';
-import type { CritterEnv } from '../world/Critter';
-import { Crow } from '../world/Crow';
+import type { Critter, CritterEnv } from '../world/Critter';
+import { BOSS_HITS, Crow } from '../world/Crow';
 import { Dust, Sparks, makeFxTextures } from '../world/fx';
 import { Level } from '../world/Level';
 import { Parallax } from '../world/Parallax';
+import { Pigeon } from '../world/Pigeon';
 import { addColorGrade } from '../world/Vignette';
 import { Web } from '../world/Web';
 import type { UIScene } from './UIScene';
@@ -37,11 +39,11 @@ const MUSIC_URL = 'assets/audio/music.ogg';
 const SHAKE_FALL_V = 1350;
 /** После толчка шалуна столько никто не толкает снова. */
 const BUMP_GRACE = 1.2;
-/** Меткий выстрел — время на долю секунды замедляется (GAME.md: блокбастер). */
-const SLOWMO_S = 0.3;
+/** Победный удар по боссу — время на миг замедляется (GAME.md: блокбастер). */
+const SLOWMO_S = 0.6;
 const SLOWMO_K = 0.3;
-/** Не чаще: на серии выстрелов замедление не должно надоедать. */
-const SLOWMO_GAP = 1.2;
+/** Голуби, которых зовёт босс, падают с неба на крышу арены за столько, мс. */
+const PIGEON_FALL_MS = 650;
 /** Финал: герой подошёл к последнему насесту на столько — сценка (крупный план, петля, улетает). */
 const FINALE_X = 900;
 /** Крупный план Ворона в начале уровня, с. */
@@ -51,10 +53,18 @@ const INTRO_ZOOM = 1.45;
 /**
  * Сцена уровня: фон, уровень из секций (Level), герой, Ворон-проводник, паутина, камера.
  * Начинается с крупного плана Ворона, дальше погоня; предметы улетают в прищепки (UIScene),
- * флаги отмечают чекпоинты; Ворон улетает с последней крыши — экран победы.
+ * флаги отмечают чекпоинты. Уровни 1–2: Ворон улетает с последней крыши — экран победы.
+ * Уровень 3: на арене битва с Вороном (10 попаданий), он роняет последние вещи —
+ * собрал их — победа.
  */
 export class LevelScene extends Phaser.Scene {
-  private def: LevelDef = LEVEL1;
+  private levelId = 1;
+  private def: LevelDef = LEVELS[1];
+  /** голуби, которых позвал босс */
+  private helpers: Critter[] = [];
+  private bossStarted = false;
+  private bossDown = false;
+  private bumpers: Critter[] = [];
   private parallax!: Parallax;
   private birds!: Birds;
   private keys!: KeyboardInput;
@@ -71,7 +81,6 @@ export class LevelScene extends Phaser.Scene {
   /** камера смотрит не на героя (крупный план) */
   private focus: { x: number; y: number; zoom: number } | null = null;
   private slowT = 0;
-  private slowCd = 0;
   private found: boolean[] = [];
   private respawnX = 0;
   private won = false;
@@ -84,8 +93,10 @@ export class LevelScene extends Phaser.Scene {
     super('Level');
   }
 
-  init(data: { restarted?: boolean }) {
+  init(data: { restarted?: boolean; levelId?: number }) {
     this.restarted = !!data.restarted;
+    this.levelId = data.levelId ?? this.levelId;
+    this.def = LEVELS[this.levelId];
   }
 
   create() {
@@ -95,8 +106,11 @@ export class LevelScene extends Phaser.Scene {
     this.finale = false;
     this.focus = null;
     this.slowT = 0;
-    this.slowCd = 0;
     this.bumpCd = 0;
+    this.helpers = [];
+    this.bossStarted = false;
+    this.bossDown = false;
+    this.setTimeScale(1);
 
     // всё светящееся — в одном слое; ореол дают сами ADD-спрайты (без полноэкранного bloom)
     const glowLayer = this.add.layer().setDepth(13);
@@ -120,16 +134,23 @@ export class LevelScene extends Phaser.Scene {
     this.controller.respawn(this.level.startX, GROUND_Y);
     this.respawnX = this.level.startX;
 
-    // Ворон несёт вещи уровня и роняет каждую в её место; шарф — улетая с насеста над стройкой
+    // Ворон несёт вещи уровня и роняет каждую в её место; вещи босса — только после победы
     const dropAtPerch = new Set(this.level.perches.map((p) => p.drop));
-    this.crow = new Crow(this, this.level.perches, env, glowLayer, {
-      items: this.level.items.filter((i) => i.state === 'carried').map((i) => ({ key: i.key, place: i.place, placeY: i.placeY, atPerch: dropAtPerch.has(i.key) })),
+    const bossItems = new Set(this.def.sections.flatMap((s) => (s.items ?? []).filter((i) => i.boss).map((i) => i.key)));
+    const carried = this.level.items.filter((i) => i.state === 'carried' && !bossItems.has(i.key));
+    this.crow = new Crow(this, this.level.perches, env, {
+      items: carried.map((i) => ({ key: i.key, place: i.place, placeY: i.placeY, atPerch: dropAtPerch.has(i.key) })),
       onDrop: (key, x, y) => this.level.items.find((i) => i.key === key)?.drop(x, y),
       onEscape: () => this.win(),
+      onBossHit: (left) => (this.scene.get('UI') as UIScene).bossHit(left),
+      onSummon: () => this.summonPigeons(env),
+      onDefeat: (x, y) => this.bossDefeated(x, y, bossItems),
     });
+    this.crow.prewarm(this.def.items);
     this.web = new Web(this, sparks, this.level.webTargets, glowLayer);
-    this.web.onHit = () => this.slowmo();
-    this.controller.onShoot = (from, facing) => this.web.fire(from, facing, [...this.level.activeCritters, this.crow]);
+    this.controller.onShoot = (from, facing) => this.web.fire(from, facing, [...this.level.activeCritters, ...this.helpers, this.crow]);
+    // шалуны для толчков — один массив на кадр, без лишнего мусора
+    this.bumpers = [];
     this.controller.onLand = (v) => {
       if (v > SHAKE_FALL_V) this.cameras.main.shake(150, 0.0035 * Math.min(2, v / SHAKE_FALL_V));
     };
@@ -145,7 +166,7 @@ export class LevelScene extends Phaser.Scene {
     addColorGrade(this);
 
     // экранный слой (кнопки, слоты, пауза, победа) — отдельная сцена поверх, зум камеры его не трогает
-    this.scene.launch('UI', { touch: this.touch, iris: this.restarted, items: this.def.items, slots: this.def.slots });
+    this.scene.launch('UI', { touch: this.touch, iris: this.restarted, items: this.def.items, slots: this.def.slots, levelId: this.levelId });
     // первый запуск — плавно из чёрного; перезапуск — раскрытие кругом (в UIScene)
     if (!this.restarted) cam.fadeIn(700, 0, 0, 0);
 
@@ -192,12 +213,40 @@ export class LevelScene extends Phaser.Scene {
     });
   }
 
-  /** Короткое замедление времени при попадании паутиной. */
-  private slowmo() {
-    if (this.slowCd > 0) return;
+  /** Герой вошёл на арену: Ворон прилетает на её насест, битва началась. */
+  private startBoss() {
+    const a = this.level.arena!;
+    this.bossStarted = true;
+    this.crow.hold = false;
+    this.crow.startBoss(a.perches, this.def.items[1]);
+    (this.scene.get('UI') as UIScene).showBossBar(BOSS_HITS);
+    feedback.caw(0.9);
+  }
+
+  /** Фаза 2: Ворон зовёт голубей — они падают с неба на крышу арены. */
+  private summonPigeons(env: CritterEnv) {
+    for (const x of this.level.arena!.pigeons) {
+      const p = new Pigeon(this, x, GROUND_Y, x - 280, x + 280, env);
+      const y = p.root.y;
+      p.root.y = WORLD_TOP;
+      this.tweens.add({ targets: p.root, y, duration: PIGEON_FALL_MS, ease: 'Bounce.Out', onComplete: () => this.sparks.burst(x, GROUND_Y - 10, 8) });
+      this.helpers.push(p);
+    }
+  }
+
+  /** Ворон повержен: миг замедления, тряска, из клюва выпадают последние вещи. */
+  private bossDefeated(x: number, y: number, keys: Set<string>) {
+    this.bossDown = true;
     this.slowT = SLOWMO_S;
-    this.slowCd = SLOWMO_GAP;
     this.setTimeScale(SLOWMO_K);
+    this.cameras.main.shake(260, 0.006);
+    feedback.win();
+    let i = 0;
+    for (const item of this.level.items) {
+      if (!keys.has(item.key)) continue;
+      this.time.delayedCall(250 + i * 300, () => item.drop(x, y - 40));
+      i++;
+    }
   }
 
   private setTimeScale(k: number) {
@@ -208,13 +257,36 @@ export class LevelScene extends Phaser.Scene {
     this.time.timeScale = k;
   }
 
-  /** Ворон улетел с последней крыши — уровень пройден. */
+  /** Ворон улетел с последней крыши (или повержен и вещи собраны) — уровень пройден. */
   private win() {
     if (this.won) return;
     this.won = true;
     this.controller.locked = true;
     feedback.win();
-    this.time.delayedCall(700, () => (this.scene.get('UI') as UIScene).showVictory(this.found));
+    progress.complete(this.levelId, this.found.filter(Boolean).length);
+    const boss = this.bossDown;
+    this.time.delayedCall(700, () => (this.scene.get('UI') as UIScene).showVictory(this.found, boss));
+  }
+
+  /** На карту (домик). */
+  goHome() {
+    this.setTimeScale(1);
+    const ui = this.scene.get('UI') as UIScene;
+    ui.irisClose(() => {
+      this.scene.stop('UI');
+      this.scene.start('Map');
+    });
+  }
+
+  /** Дальше: следующий готовый уровень, иначе — на карту. */
+  nextLevel() {
+    if (!LEVELS[this.levelId + 1]) {
+      this.goHome();
+      return;
+    }
+    this.setTimeScale(1);
+    const ui = this.scene.get('UI') as UIScene;
+    ui.irisClose(() => this.scene.restart({ restarted: true, levelId: this.levelId + 1 }));
   }
 
   /**
@@ -270,7 +342,6 @@ export class LevelScene extends Phaser.Scene {
       this.slowT -= real;
       if (this.slowT <= 0) this.setTimeScale(1);
     }
-    this.slowCd = Math.max(0, this.slowCd - real);
     const dt = this.slowT > 0 ? real * SLOWMO_K : real;
     if (this.keys.debugPressed) this.hero.debug = !this.hero.debug;
 
@@ -281,6 +352,12 @@ export class LevelScene extends Phaser.Scene {
     this.level.update(dt, body, this.cameras.main);
     this.controller.update(dt);
     this.crow.update(dt);
+    for (const p of this.helpers) p.update(dt);
+    // голуби босса в коконах — Ворона снова можно бить
+    if (this.helpers.length && this.helpers.every((p) => !p.alive)) {
+      this.crow.unshield();
+      this.helpers = this.helpers.filter((p) => p.state !== 'gone');
+    }
     const swing = this.controller.swing;
     if (swing) {
       const hand = this.hero.swingHand();
@@ -290,12 +367,21 @@ export class LevelScene extends Phaser.Scene {
     this.checkBumps(dt);
     this.checkItems();
     this.checkFlags();
-    if (!this.finale && this.crow.atLastPerch && this.crow.x - this.hero.x < FINALE_X) this.startFinale();
+    const arena = this.level.arena;
+    if (arena) {
+      if (!this.bossStarted && this.hero.x > arena.x + 150) this.startBoss();
+      // вещи босса собраны — победа
+      if (this.bossDown && !this.won && this.level.items.every((i) => !this.isBossItem(i.key) || i.state === 'collected')) this.win();
+    } else if (!this.finale && this.crow.atLastPerch && this.crow.x - this.hero.x < FINALE_X) this.startFinale();
     // упал ниже крыши мимо тентов (не должно случаться) — мягко к последнему флагу
     if (body.bottom >= GAME_H - 2 && !this.won) this.controller.respawn(this.respawnX, GROUND_Y);
     this.birds.update(dt);
     this.updateCamera(Math.min(deltaMs / 1000, 0.1));
     this.parallax.update(dt);
+  }
+
+  private isBossItem(key: string) {
+    return this.def.sections.some((s) => s.items?.some((i) => i.key === key && i.boss));
   }
 
   /** Коснулся предмета — он подпрыгивает и улетает в свою прищепку наверху. */
@@ -328,7 +414,22 @@ export class LevelScene extends Phaser.Scene {
     this.bumpCd = Math.max(0, this.bumpCd - dt);
     if (this.bumpCd > 0 || this.controller.locked) return;
     const b = this.controller.body;
-    for (const c of this.level.activeCritters) {
+    // Ворон в пике толкает, как шалун
+    if (this.crow.diving) {
+      const nx = Phaser.Math.Clamp(this.crow.x, b.left, b.right);
+      const ny = Phaser.Math.Clamp(this.crow.y, b.top, b.bottom);
+      if (Math.hypot(this.crow.x - nx, this.crow.y - ny) < 60) {
+        this.controller.bump(Math.sign(b.center.x - this.crow.x) || -this.hero.facing);
+        this.cameras.main.shake(120, 0.003);
+        this.bumpCd = BUMP_GRACE;
+        return;
+      }
+    }
+    const list = this.bumpers;
+    list.length = 0;
+    for (const c of this.level.activeCritters) list.push(c);
+    for (const c of this.helpers) list.push(c);
+    for (const c of list) {
       const r = c.hurtRadius;
       if (!c.alive || r === 0) continue;
       const nx = Phaser.Math.Clamp(c.x, b.left, b.right);

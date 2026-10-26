@@ -5,6 +5,8 @@ import type { PlatformLook } from '../world/Platforms';
  * y — мировой (крыша — GROUND_Y). Level собирает секции подряд слева направо.
  */
 export interface LevelDef {
+  /** номер уровня на карте (src/config/levels.json) */
+  id: number;
   /** 3 предмета уровня по порядку слотов (ключи картинок в assets/items) */
   items: string[];
   /** фон слотов: мир 1 — бельевая верёвка (мир 2 — полка, мир 3 — стол) */
@@ -37,6 +39,11 @@ export interface SectionDef {
   crow?: { x: number; y: number; drop?: string };
   /** место под будущего шалуна (кот, белка, голубь-толстяк) — пока стоит существующий */
   slot?: string;
+  /**
+   * Арена битвы с боссом (уровень 3 мира): злодей прилетает сюда, когда герой вошёл в секцию.
+   * perches — насесты, pigeons — x, где приземляются голуби, которых он зовёт на помощь.
+   */
+  arena?: { perches: { x: number; y: number }[]; pigeons: number[] };
 }
 
 export interface SolidDef {
@@ -73,4 +80,6 @@ export interface ItemDef {
   carried?: boolean;
   /** висит на тележке с крюком (id тележки) — едет вместе с ней */
   attach?: string;
+  /** выпадает у побеждённого босса: x, y — куда падает */
+  boss?: boolean;
 }

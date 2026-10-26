@@ -10,6 +10,7 @@ import type { LevelDef } from './types';
  * Шалуны мира 1: дроны-мишени, голуби, чайки, дроны-2 — 16 штук, не больше 2–3 на экране.
  */
 export const LEVEL1: LevelDef = {
+  id: 1,
   items: ['scarf', 'cap', 'tshirt'],
   slots: 'rope',
   sections: [

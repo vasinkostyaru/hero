@@ -113,7 +113,7 @@ export class Web {
           this.onHit();
           this.splat(s.target.x, s.target.y, 46, 0.35);
           this.sparks.burst(s.target.x, s.target.y, 14);
-          this.scene.cameras.main.shake(140, 0.004);
+          this.scene.cameras.main.shake(90, 0.002);
           this.kill(s);
           continue;
         }

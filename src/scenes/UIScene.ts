@@ -31,6 +31,8 @@ export class UIScene extends Phaser.Scene {
   private victory: ItemSlots | null = null;
   private overlay: Phaser.GameObjects.Container | null = null;
   private corner!: Phaser.GameObjects.Container;
+  /** перья босса: сколько попаданий осталось */
+  private bossBar: Phaser.GameObjects.Image[] = [];
 
   constructor() {
     super('UI');
@@ -43,6 +45,7 @@ export class UIScene extends Phaser.Scene {
     this.slotStyle = data.slots;
     this.victory = null;
     this.overlay = null;
+    this.bossBar = [];
   }
 
   private get game_() {
@@ -59,7 +62,7 @@ export class UIScene extends Phaser.Scene {
     // в углу — пауза и домик
     this.corner = this.add.container(0, 0, [
       this.iconButton('ui_pause', 86, 86, CORNER_BTN, () => this.showPause()),
-      this.iconButton('ui_home', 196, 86, CORNER_BTN, () => this.game_.restartRoom()),
+      this.iconButton('ui_home', 196, 86, CORNER_BTN, () => this.game_.goHome()),
     ]);
 
     // ширина экрана зависит от телефона и может смениться (поворот, шторка) — перекладываем кнопки
@@ -159,10 +162,9 @@ export class UIScene extends Phaser.Scene {
         demo.restartRoom();
       }),
       this.iconButton('ui_home', W / 2 + 260, H / 2, 1.25, () => {
-        // карты пока нет — домик тоже начинает уровень заново
         close();
         this.scene.resume('Level');
-        demo.restartRoom();
+        demo.goHome();
       }),
     ]).setDepth(1000);
     this.setControlsVisible(false);
@@ -172,11 +174,12 @@ export class UIScene extends Phaser.Scene {
    * Победа: верёвка с тремя предметами (найденные — в цвете, остальные — силуэтом),
    * звёзды падают по одной, Август машет вслед Ворону; кнопки «дальше» и «ещё раз».
    */
-  showVictory(found: boolean[]) {
+  showVictory(found: boolean[], boss = false) {
     const W = this.scale.width;
     const H = this.scale.height;
     this.setControlsVisible(false);
     this.hud.root.setVisible(false);
+    for (const f of this.bossBar) f.setVisible(false);
     const dim = this.add.rectangle(0, 0, W, H, DIM, 0).setOrigin(0, 0).setInteractive();
     this.tweens.add({ targets: dim, fillAlpha: 0.72, duration: 500 });
     const slots = new ItemSlots(this, W / 2, H * 0.42, this.itemKeys, this.slotStyle, 1.7, 190);
@@ -208,23 +211,49 @@ export class UIScene extends Phaser.Scene {
     // Август машет вслед Ворону: попеременно стоит и тянет руку
     const hero = this.add.sprite(W * 0.18, H - 120, 'hero', 'idle').setOrigin(0.5, 300 / 320).setScale(1.4);
     this.time.addEvent({ delay: 380, loop: true, callback: () => hero.setFrame(hero.frame.name === 'idle' ? 'shoot' : 'idle') });
-    // а Ворон с носком в клюве улетает в правый верхний угол, машет крыльями
-    const crowImg = this.add.image(0, 0, 'crow_fly_1').setScale(0.3);
-    const sock = this.add.image(46, 12, 'sock').setScale(0.24).setOrigin(0.5, 0.15);
-    const crow = this.add.container(W * 0.72, H * 0.2, [crowImg, sock]);
-    this.time.addEvent({ delay: 125, loop: true, callback: () => crowImg.setTexture(crowImg.texture.key === 'crow_fly_1' ? 'crow_fly_2' : 'crow_fly_1') });
-    this.tweens.add({ targets: crow, x: W + 200, y: -150, duration: 3200, ease: 'Sine.In' });
+    let crow: Phaser.GameObjects.GameObject;
+    if (boss) {
+      // побеждённый Ворон сидит без сил рядом, над ним кружат звёздочки; салют
+      crow = this.add.image(W * 0.8, H - 90, 'crow_dizzy').setScale(0.55).setOrigin(0.5, 1);
+      this.time.addEvent({ delay: 420, repeat: 10, callback: () => this.burst(W * (0.15 + Math.random() * 0.7), H * (0.1 + Math.random() * 0.3), 26) });
+    } else {
+      // Ворон с носком в клюве улетает в правый верхний угол, машет крыльями
+      const crowImg = this.add.image(0, 0, 'crow_fly_1').setScale(0.3);
+      const sock = this.add.image(46, 12, 'sock').setScale(0.24).setOrigin(0.5, 0.15);
+      const fly = this.add.container(W * 0.72, H * 0.2, [crowImg, sock]);
+      this.time.addEvent({ delay: 125, loop: true, callback: () => crowImg.setTexture(crowImg.texture.key === 'crow_fly_1' ? 'crow_fly_2' : 'crow_fly_1') });
+      this.tweens.add({ targets: fly, x: W + 200, y: -150, duration: 3200, ease: 'Sine.In' });
+      crow = fly;
+    }
 
     const buttons = [
       this.iconButton('ui_restart', W / 2 - 150, H - 140, 1.15, () => this.game_.restartRoom()),
-      // уровней дальше и карты пока нет — «дальше» тоже начинает уровень 1
-      this.iconButton('ui_play', W / 2 + 150, H - 140, 1.35, () => this.game_.restartRoom()),
+      this.iconButton('ui_play', W / 2 + 150, H - 140, 1.35, () => this.game_.nextLevel()),
     ];
     for (const b of buttons) {
       b.setAlpha(0);
       this.tweens.add({ targets: b, alpha: 1, duration: 300, delay: 1900 });
     }
     this.overlay = this.add.container(0, 0, [dim, slots.root, ...stars, hero, crow, ...buttons]).setDepth(1000);
+  }
+
+  /** Битва с боссом: под верёвкой — ряд перьев, по одному за каждое оставшееся попадание. */
+  showBossBar(n: number) {
+    makeFeather(this);
+    const W = this.scale.width;
+    const gap = 46;
+    this.bossBar = Array.from({ length: n }, (_, i) =>
+      this.add.image(W / 2 + (i - (n - 1) / 2) * gap, 150, 'boss_feather').setScale(0).setAngle(-20),
+    );
+    this.bossBar.forEach((f, i) => this.tweens.add({ targets: f, scale: 1, delay: i * 60, duration: 300, ease: 'Back.Out' }));
+  }
+
+  /** Попал по боссу — одно перо вылетает с искрами. */
+  bossHit(left: number) {
+    const f = this.bossBar[left];
+    if (!f) return;
+    this.burst(f.x, f.y, 10);
+    this.tweens.add({ targets: f, y: f.y - 60, angle: 200, alpha: 0, duration: 450, ease: 'Cubic.Out' });
   }
 
   /** Круглая кнопка-иконка: при нажатии сжимается, отпустили — пружинит и срабатывает. */
@@ -344,4 +373,16 @@ export class UIScene extends Phaser.Scene {
       g.strokePath();
     }
   }
+}
+
+/** Перо Ворона (полоса босса) — один раз в текстуру: тёмно-фиолетовое, с тёплым бликом. */
+function makeFeather(scene: Phaser.Scene) {
+  if (scene.textures.exists('boss_feather')) return;
+  const g = scene.make.graphics({}, false);
+  g.fillStyle(0x140820, 1).fillEllipse(20, 30, 26, 54);
+  g.fillStyle(0x3a2456, 1).fillEllipse(20, 28, 18, 46);
+  g.fillStyle(0xffb46a, 0.6).fillEllipse(16, 20, 5, 22);
+  g.lineStyle(3, 0x140820, 1).lineBetween(20, 50, 20, 62);
+  g.generateTexture('boss_feather', 40, 64);
+  g.destroy();
 }

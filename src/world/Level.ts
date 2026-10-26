@@ -77,6 +77,8 @@ export class Level {
   readonly critters: Critter[] = [];
   readonly flags: Flag[] = [];
   readonly perches: Perch[] = [];
+  /** арена босса: где начинается, насесты, где приземляются голуби (мировые координаты) */
+  arena: { x: number; perches: Perch[]; pigeons: number[] } | null = null;
   private sections: Section[] = [];
   private cradles: { cradle: Cradle; solid: Solid }[] = [];
   private trolleys = new Map<string, Trolley>();
@@ -99,6 +101,8 @@ export class Level {
     this.width = x0;
     this.startX = start;
     this.buildItems(def);
+    // пока ни одна секция не скрыта — активны все
+    this.active = [...this.critters];
   }
 
   /** Строит секцию и запоминает всё, что она добавила в сцену и в слой свечения. */
@@ -148,6 +152,7 @@ export class Level {
       sec.updaters.push(flag);
     }
     if (sd.crow) this.perches.push({ ...sd.crow, x: X(sd.crow.x) });
+    if (sd.arena) this.arena = { x: x0, perches: sd.arena.perches.map((p) => ({ ...p, x: X(p.x) })), pigeons: sd.arena.pigeons.map(X) };
 
     for (const c of sd.critters ?? []) {
       const critter = this.makeCritter(c, X);
@@ -181,15 +186,14 @@ export class Level {
         guard ? () => guard.alive : undefined,
         // предмет висит под крюком: верх картинки — у кончика крюка
         trolley ? () => { const p = trolley.hookPoint(); return { x: p.x, y: p.y + 30 }; } : null,
-        it.carried,
+        it.carried || it.boss,
       );
       this.items.push(item);
       // предмет у злодея может оказаться где угодно — его не прячем вместе с секцией
-      if (!it.carried) {
+      if (!it.carried && !it.boss) {
         it.sec.objects.push(...this.scene.children.list.filter((o) => !before.has(o)));
         it.sec.objects.push(...this.glowLayer.list.filter((o) => !beforeGlow.has(o)));
       }
-      it.sec.updaters.push(item);
     }
     this.pendingItems = [];
   }
@@ -218,10 +222,11 @@ export class Level {
     this.bodies.push(body);
   }
 
-  /** Активный шалун ближе всего к экрану — только из видимых секций. */
+  /** Шалуны видимых секций (массив пересобирается, только когда секции появляются/пропадают). */
   get activeCritters() {
-    return this.sections.filter((s) => s.near).flatMap((s) => s.critters);
+    return this.active;
   }
+  private active: Critter[] = [];
 
   /** Флаг, который герой только что пробежал (или null). */
   passFlag(heroX: number) {
@@ -252,6 +257,7 @@ export class Level {
       if (near !== s.near) {
         s.near = near;
         for (const o of s.objects) (o as unknown as { cameraFilter: number }).cameraFilter = near ? 0 : cam.id;
+        this.active = this.sections.filter((x) => x.near).flatMap((x) => x.critters);
       }
       if (!near) continue;
       for (const u of s.updaters) u.update(dt);
@@ -273,6 +279,8 @@ export class Level {
     }
     for (const b of this.bouncers) b.update(dt);
     for (const h of this.hooks) h.update(dt, hero.center.x, hero.center.y);
+    // предметов всего три — обновляем всегда: роняют их и далеко от героя
+    for (const it of this.items) it.update(dt);
   }
 
   /** Стены и ящик — в них прилипает паутина. */
