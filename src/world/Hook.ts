@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import { GROUND_Y } from '../config/game';
 
 /** Насколько далеко дотягивается нить качелей (от центра героя до крюка). */
-export const SWING_REACH = 440;
-const POLE_TOP = GROUND_Y - 560;
+export const SWING_REACH = 640;
+const POLE_TOP = GROUND_Y - 800;
 const RING_KEY = 'hook_ring';
 
 /**

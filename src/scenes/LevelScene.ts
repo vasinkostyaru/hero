@@ -261,7 +261,10 @@ export class LevelScene extends Phaser.Scene {
     this.controller.update(dt);
     this.crow.update(dt);
     const swing = this.controller.swing;
-    this.web.rope = swing ? { x1: body.center.x + this.hero.facing * 12, y1: body.top + 46, x2: swing.hook.x, y2: swing.hook.y } : null;
+    if (swing) {
+      const hand = this.hero.swingHand();
+      this.web.rope = { x1: hand.x, y1: hand.y, x2: swing.hook.x, y2: swing.hook.y + 8 };
+    } else this.web.rope = null;
     this.web.update(dt);
     this.checkBumps(dt);
     this.checkItems();

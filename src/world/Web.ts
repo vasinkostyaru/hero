@@ -49,6 +49,8 @@ export class Web {
   private t = 0;
   /** нить качелей от руки к крюку; null — не качаемся */
   rope: { x1: number; y1: number; x2: number; y2: number } | null = null;
+  /** сколько нить уже есть: выстреливает из руки к крюку за долю секунды */
+  private ropeT = -1;
   /** попали в шалуна — для замедления времени */
   onHit: () => void = () => {};
 
@@ -167,6 +169,7 @@ export class Web {
     const g = this.g;
     g.clear();
     if (this.rope) this.drawRope(this.rope);
+    else this.ropeT = -1;
     for (const s of this.shots) {
       this.drawTrail(s);
       this.drawBall(s.x, s.y, 11, s.age * 14);
@@ -198,26 +201,45 @@ export class Web {
     }
   }
 
-  /** Нить качелей: две светящиеся пряди, чуть дрожат и переплетаются. */
+  /**
+   * Нить качелей — паутина, а не верёвка: бирюзовое свечение, белая сердцевина, две тонкие
+   * пряди вьются вокруг неё; у крюка — сеточка, которой нить прилипла. Появляется,
+   * выстреливая из руки к крюку.
+   */
   private drawRope(r: { x1: number; y1: number; x2: number; y2: number }) {
     const g = this.g;
-    const n = 14;
-    const nx = -(r.y2 - r.y1);
-    const ny = r.x2 - r.x1;
+    if (this.ropeT < 0) {
+      this.ropeT = 0;
+      this.sparks.burst(r.x2, r.y2, 10);
+    }
+    this.ropeT += 1 / 60;
+    const grow = Math.min(1, this.ropeT / 0.09);
+    const ex = r.x1 + (r.x2 - r.x1) * grow;
+    const ey = r.y1 + (r.y2 - r.y1) * grow;
+    const nx = -(ey - r.y1);
+    const ny = ex - r.x1;
     const len = Math.hypot(nx, ny) || 1;
+    // свечение и сердцевина
+    g.lineStyle(10, 0x5ff5e6, 0.16).lineBetween(r.x1, r.y1, ex, ey);
+    g.lineStyle(3.2, 0xffffff, 0.95).lineBetween(r.x1, r.y1, ex, ey);
+    // пряди вьются вокруг сердцевины, у концов сходятся
+    const n = 22;
     for (const strand of [1, -1]) {
-      g.lineStyle(strand > 0 ? 3 : 2, 0xf4fffd, strand > 0 ? 0.95 : 0.6);
+      g.lineStyle(1.4, 0xe8fffb, 0.75);
       g.beginPath();
       for (let i = 0; i <= n; i++) {
         const k = i / n;
-        const w = strand * Math.sin(this.t * 20 + k * 9) * 2.5 * Math.sin(k * Math.PI);
-        const x = r.x1 + (r.x2 - r.x1) * k + (nx / len) * w;
-        const y = r.y1 + (r.y2 - r.y1) * k + (ny / len) * w;
+        const w = strand * Math.sin(k * Math.PI * 7 + this.t * 9) * 4.5 * Math.sin(k * Math.PI);
+        const x = r.x1 + (ex - r.x1) * k + (nx / len) * w;
+        const y = r.y1 + (ey - r.y1) * k + (ny / len) * w;
         if (i === 0) g.moveTo(x, y);
         else g.lineTo(x, y);
       }
       g.strokePath();
     }
+    if (grow >= 1) this.drawNet(r.x2, r.y2, 24, 1, 7.3);
+    // у руки — маленький комочек, откуда тянется нить
+    g.fillStyle(0xffffff, 0.9).fillCircle(r.x1, r.y1, 4);
   }
 
   /** Паутинный шарик: спицы и кольцо, крутится в полёте. */

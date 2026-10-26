@@ -15,6 +15,10 @@ const SOCK_SCALE = 0.42;
 const FLAP_FPS = 8;
 /** Клюв в полёте — от точки у лап (вещь висит под ним); картинки выровнены по клюву (beak.json). */
 const BEAK = { x: 70, y: -125 };
+/** На насесте вещь свисает с нижней половины раскрытого клюва (crow_laugh, от точки у лап). */
+const LAUGH_BEAK = { x: 53, y: -143 };
+/** Сидит над местом вещи — роняет её, когда герой подошёл настолько (видит это). */
+const DROP_X = 950;
 /** Вещь в клюве — по большей стороне (как на art/crow_items_preview.png, ~треть Ворона). */
 const CARRY_SIZE = 70;
 const HITS = 3;
@@ -111,7 +115,8 @@ export class Crow implements WebTarget {
     this.beak = scene.cache.json.get('crow_beak');
     this.laugh = scene.add.image(0, 0, scaledTexture(scene, 'crow_laugh', LAUGH_SCALE)).setOrigin(0.5, 1);
     this.fly = scene.add.image(BEAK.x, BEAK.y, scaledTexture(scene, 'crow_fly_1', FLY_SCALE)).setVisible(false);
-    this.carry = scene.add.image(BEAK.x, BEAK.y, 'sock').setOrigin(0.5, 0.15).setVisible(false);
+    // вещь в клюве видна всегда — и на насесте, и в полёте: понятно, что у него ещё есть одежда
+    this.carry = scene.add.image(BEAK.x, BEAK.y, 'sock').setOrigin(0.5, 0.15);
     this.dizzy = scene.add.image(0, 0, scaledTexture(scene, 'crow_dizzy', DIZZY_SCALE)).setOrigin(0.5, 1).setVisible(false);
     this.stars = scene.add.graphics();
     this.root = scene.add.container(p.x, p.y, [this.laugh, this.fly, this.carry, this.dizzy, this.stars]).setDepth(8);
@@ -274,7 +279,21 @@ export class Crow implements WebTarget {
       }
     }
 
+    // вещь свисает из клюва и качается, пока хохочет
+    const shake = this.laughT >= 0 ? Math.sin(this.laughT * 28) * 0.06 : 0;
+    this.carry
+      .setPosition(LAUGH_BEAK.x * this.facing, LAUGH_BEAK.y + (this.laughT >= 0 ? -4 * Math.abs(Math.sin(this.laughT * 20)) : 0))
+      .setFlipX(this.facing < 0)
+      .setRotation(shake * 3 + 0.12 * Math.sin(this.t * 2.4));
+
     if (this.hold) return;
+    // насест над местом вещи: герой подошёл и видит — роняет её туда, хохочет и ждёт дальше
+    const here = this.perches[this.perch];
+    if (here.drop && this.carried[0]?.key === here.drop && dx > -DROP_X) {
+      here.drop = undefined;
+      this.dropCarried();
+      this.laughNow();
+    }
     if (this.opts.boss ? Math.abs(dx) < FLEE_X && Math.abs(hero.y - this.root.y) < FLEE_Y : dx > -LEAD_X) this.flee();
   }
 
@@ -364,7 +383,6 @@ export class Crow implements WebTarget {
       this.stateT = 0;
       this.root.setRotation(0);
       this.fly.setVisible(false);
-      this.carry.setVisible(false);
       this.laugh.setVisible(true);
       this.kick(-0.14);
       // сел — и сразу дразнится

@@ -6,7 +6,7 @@ import type { LevelDef } from './types';
  * Вещи несёт Ворон и роняет каждую в её место (CROW2.md): кепку — в гнездо под голубем
  * (сторож), шарф — на крюк крана у героя на глазах (на пути), футболку — на антенну
  * на башне над лесами (высоко, по желанию; видна с крыши).
- * Шалуны мира 1: дроны-мишени, голуби, чайка, дрон-2 — 8 штук, не больше 2–3 на экране.
+ * Шалуны мира 1: дроны-мишени, голуби, чайки, дроны-2 — 16 штук, не больше 2–3 на экране.
  */
 export const LEVEL1: LevelDef = {
   items: ['scarf', 'cap', 'tshirt'],
@@ -24,6 +24,7 @@ export const LEVEL1: LevelDef = {
         { key: 'chimney', x: 1150, heroes: 1.5 },
         { key: 'antenna', x: 1450, heroes: 2, far: true },
       ],
+      critters: [{ kind: 'drone', x: 820, y: G - 430 }],
       crow: { x: 1190, y: G - 248 },
     },
     {
@@ -43,6 +44,7 @@ export const LEVEL1: LevelDef = {
       critters: [
         { kind: 'drone', x: 900, y: G - 480 },
         { kind: 'drone', x: 1480, y: G - 380 },
+        { kind: 'pigeon', x: 700, floorY: G - 190, minX: 590, maxX: 830 },
       ],
       crow: { x: 1790, y: G - 248 },
     },
@@ -66,6 +68,8 @@ export const LEVEL1: LevelDef = {
         { kind: 'pigeon', id: 'nestGuard', x: 1170, floorY: G - 110, minX: 1170, maxX: 1170 },
       ],
       items: [{ key: 'cap', x: 1170, y: G - 132, guard: 'nestGuard', carried: true }],
+      // сидит на мостике за гнездом: герой подходит — роняет кепку в гнездо
+      crow: { x: 1600, y: G - 220, drop: 'cap' },
     },
     {
       // стройка: Ворон пролетает над балкой и роняет шарф — тот цепляется за крюк крана
@@ -81,7 +85,10 @@ export const LEVEL1: LevelDef = {
         { key: 'chimney', x: 660, heroes: 1.5 },
         { key: 'antenna', x: 1950, heroes: 2, far: true },
       ],
-      critters: [{ kind: 'drone', x: 1700, y: G - 560 }],
+      critters: [
+        { kind: 'drone', x: 1700, y: G - 560 },
+        { kind: 'pigeon', x: 350, floorY: G - 215, minX: 190, maxX: 510 },
+      ],
       items: [{ key: 'scarf', x: 0, y: 0, carried: true, attach: 'crane' }],
       crow: { x: 1050, y: G - 425, drop: 'scarf' },
     },
@@ -98,9 +105,14 @@ export const LEVEL1: LevelDef = {
         { x: 1000, y: G - 250, w: 420, h: 64, kind: 'platform', look: 'scaffold' },
         { x: 1150, y: G - 650, w: 110, h: 400, kind: 'wall', climbable: true },
       ],
-      props: [{ key: 'antenna', x: 1205, heroes: 1.1, y: G - 646 }],
-      critters: [{ kind: 'seagull', x: 900, y: G - 760, range: 350 }],
-      items: [{ key: 'tshirt', x: 1225, y: G - 755, carried: true }],
+      props: [{ key: 'antenna', x: 1180, heroes: 1.1, y: G - 646 }],
+      critters: [
+        { kind: 'seagull', x: 900, y: G - 760, range: 350 },
+        { kind: 'pigeon', x: 1200, floorY: G, minX: 700, maxX: 1700 },
+      ],
+      items: [{ key: 'tshirt', x: 1200, y: G - 755, carried: true }],
+      // сидит на верху башни рядом с антенной — роняет на неё футболку
+      crow: { x: 1245, y: G - 650, drop: 'tshirt' },
     },
     {
       // широкая улица: не перепрыгнуть — качели на паутине за фонарь на тросе
@@ -111,7 +123,9 @@ export const LEVEL1: LevelDef = {
         [0, 560],
         [1320, 1800],
       ],
-      hooks: [{ x: 940, y: G - 430, spanL: 430, spanR: 1450 }],
+      // крюк высоко: нить длинная, размах большой
+      hooks: [{ x: 940, y: G - 650, spanL: 430, spanR: 1450 }],
+      critters: [{ kind: 'drone', x: 1650, y: G - 380 }],
       crow: { x: 1560, y: G },
     },
     {
@@ -129,7 +143,11 @@ export const LEVEL1: LevelDef = {
         { key: 'water_tower', x: 1800, heroes: 3.4, far: true },
         { key: 'chimney', x: 1950, heroes: 1.5 },
       ],
-      critters: [{ kind: 'drone2', x: 1500, y: G - 470 }],
+      critters: [
+        { kind: 'drone2', x: 1500, y: G - 470 },
+        { kind: 'pigeon', x: 1800, floorY: G, minX: 1300, maxX: 2150 },
+      ],
+      crow: { x: 1105, y: G - 545 },
     },
     {
       // финал: Ворон на водонапорной бочке хохочет и улетает с носком → победа
@@ -143,7 +161,11 @@ export const LEVEL1: LevelDef = {
         { key: 'ac_unit', x: 2300, heroes: 0.6 },
       ],
       lamps: [{ x: 2100 }],
-      critters: [{ kind: 'pigeon', x: 600, floorY: G, minX: 400, maxX: 1000 }],
+      critters: [
+        { kind: 'pigeon', x: 600, floorY: G, minX: 400, maxX: 1000 },
+        { kind: 'drone2', x: 1300, y: G - 520 },
+        { kind: 'seagull', x: 1900, y: G - 760, range: 400 },
+      ],
       crow: { x: 1700, y: G - 690 },
     },
   ],

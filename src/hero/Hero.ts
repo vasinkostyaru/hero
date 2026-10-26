@@ -139,6 +139,12 @@ export class Hero {
     this.wobVel = -dir * 420;
   }
 
+  /** Рука, поднятая к крюку (кадр jump), в мировых координатах — с поворотом и squash героя. */
+  swingHand(): { x: number; y: number } {
+    const p = this.root.getWorldTransformMatrix().transformPoint(HAND.jump.x * this.facing, HAND.jump.y);
+    return { x: p.x, y: p.y };
+  }
+
   /** Толчок пружины squash: < 0 — сплющить, > 0 — вытянуть. */
   kick(amount: number) {
     if (amount === 0) return;
@@ -242,6 +248,11 @@ export class Hero {
         s.anims.timeScale = 0.5 + 0.6 * m.speed;
         break;
       case 'air': {
+        // на качелях — рука вверх, к крюку
+        if (this.swingAngle !== null) {
+          s.setFrame('jump');
+          break;
+        }
         const name = m.vy < -VY_APEX ? 'jump' : m.vy <= VY_APEX ? 'apex' : m.vy <= VY_FALL2 ? 'fall_1' : 'fall_2';
         s.setFrame(name);
         break;
