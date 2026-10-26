@@ -141,7 +141,8 @@ export class LevelScene extends Phaser.Scene {
     this.crow = new Crow(this, this.level.perches, env, {
       items: carried.map((i) => ({ key: i.key, place: i.place, placeY: i.placeY, atPerch: dropAtPerch.has(i.key) })),
       onDrop: (key, x, y) => this.level.items.find((i) => i.key === key)?.drop(x, y),
-      onEscape: () => this.win(),
+      // на уровне с боссом улёт ничего не заканчивает — только победа в битве
+      onEscape: () => !this.level.arena && this.win(),
       onBossHit: (left) => (this.scene.get('UI') as UIScene).bossHit(left),
       onSummon: (wave) => this.summonWave(wave),
       onDefeat: (x, y) => this.bossDefeated(x, y, bossItems),

@@ -258,9 +258,10 @@ export class Crow implements WebTarget {
     this.kick(-0.18);
     this.flashWhite();
     if (!this.boss) {
-      // на уровне не падает — сердится и улетает раньше
+      // на уровне не падает — сердится и улетает раньше; с последнего насеста не улетает:
+      // там его ждёт финальная сценка или битва
       feedback.caw(0.85);
-      if (this.state === 'perch') this.flee();
+      if (this.state === 'perch' && !this.atLastPerch) this.flee();
       return;
     }
     this.opts.onBossHit?.(BOSS_HITS - this.hits);
