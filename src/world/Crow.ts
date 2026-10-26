@@ -28,7 +28,7 @@ const GRAVITY = 1900;
 /** Голова на crow_dizzy относительно лап (origin снизу по центру) — над ней кружат звёздочки. */
 const DIZZY_HEAD = { x: 66, y: -100 };
 
-type CrowState = 'perch' | 'fly' | 'escape' | 'gone' | 'dizzy';
+type CrowState = 'perch' | 'fly' | 'tease' | 'escape' | 'gone' | 'dizzy';
 /** Уровень: дразнится и ведёт вперёд, в конце улетает. Босс: перелетает между насестами, 3 попадания. */
 export interface CrowOptions {
   boss?: boolean;
@@ -141,6 +141,17 @@ export class Crow implements WebTarget {
     feedback.caw(1.2);
   }
 
+  /** Сидит на последнем насесте уровня — ждёт финальной сценки (сам не улетает). */
+  get atLastPerch() {
+    return !this.opts.boss && this.state === 'perch' && this.perch === this.perches.length - 1;
+  }
+
+  /** Финальная сценка: взлетает с носком, делает дразнящую мёртвую петлю над (x, y) и улетает за край. */
+  tease(x: number, y: number) {
+    this.startFlight({ x, y }, { x, y }, 1.4);
+    this.state = 'tease';
+  }
+
   /** Сразу улететь вперёд (после крупного плана в начале уровня). */
   leave() {
     if (this.state === 'perch') this.flee();
@@ -236,6 +247,7 @@ export class Crow implements WebTarget {
         this.perched(dt);
         break;
       case 'fly':
+      case 'tease':
       case 'escape':
         this.flying(dt);
         break;
@@ -275,7 +287,7 @@ export class Crow implements WebTarget {
       }
     }
 
-    if (this.hold) return;
+    if (this.hold || this.atLastPerch) return;
     if (this.opts.boss ? Math.abs(dx) < FLEE_X && Math.abs(hero.y - this.root.y) < FLEE_Y : dx > -LEAD_X) this.flee();
   }
 
@@ -350,10 +362,19 @@ export class Crow implements WebTarget {
     this.root.y = a * this.from.y + b * this.ctrl.y + c * this.to.y;
     // взмахи, наклон по ходу
     this.flap();
-    this.root.setRotation(Phaser.Math.Clamp((this.root.y - prevY) * 0.02, -0.3, 0.3) * this.facing);
+    // в финале — мёртвая петля в середине подлёта, иначе — наклон по ходу
+    const loop = this.state === 'tease' ? Phaser.Math.Clamp((u - 0.35) / 0.5, 0, 1) : 0;
+    this.root.setRotation(
+      loop > 0 && loop < 1 ? -loop * Math.PI * 2 * this.facing : Phaser.Math.Clamp((this.root.y - prevY) * 0.02, -0.3, 0.3) * this.facing,
+    );
     // пролетает над местом следующей вещи — роняет её туда
     const next = this.carried[0];
     if (next && !next.atPerch && (this.root.x - next.place) * this.facing >= 0 && Math.abs(this.root.x - next.place) < 400) this.dropCarried();
+    if (u >= 1 && this.state === 'tease') {
+      feedback.caw(1.15);
+      this.escape();
+      return;
+    }
     if (u >= 1 && this.state === 'escape') {
       this.state = 'gone';
       this.root.setVisible(false);

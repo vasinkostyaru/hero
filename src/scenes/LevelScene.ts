@@ -42,6 +42,8 @@ const SLOWMO_S = 0.3;
 const SLOWMO_K = 0.3;
 /** Не чаще: на серии выстрелов замедление не должно надоедать. */
 const SLOWMO_GAP = 1.2;
+/** Финал: герой подошёл к последнему насесту на столько — сценка (крупный план, петля, улетает). */
+const FINALE_X = 900;
 /** Крупный план Ворона в начале уровня, с. */
 const INTRO_S = 2.4;
 const INTRO_ZOOM = 1.45;
@@ -73,6 +75,7 @@ export class LevelScene extends Phaser.Scene {
   private found: boolean[] = [];
   private respawnX = 0;
   private won = false;
+  private finale = false;
   hero!: Hero;
   controller!: HeroController;
   level!: Level;
@@ -89,6 +92,7 @@ export class LevelScene extends Phaser.Scene {
     makeFxTextures(this);
     this.found = this.def.items.map(() => false);
     this.won = false;
+    this.finale = false;
     this.focus = null;
     this.slowT = 0;
     this.slowCd = 0;
@@ -168,6 +172,23 @@ export class LevelScene extends Phaser.Scene {
       this.crow.leave();
       this.focus = null;
       this.controller.locked = false;
+    });
+  }
+
+  /**
+   * Финальная сценка: камера наезжает на Ворона на последней крыше, он хохочет,
+   * взлетает с носком, делает над Августом мёртвую петлю и улетает за край → победа.
+   */
+  private startFinale() {
+    this.finale = true;
+    this.controller.locked = true;
+    const c = this.crow;
+    this.focus = { x: (this.hero.x + c.x) / 2, y: Math.min(this.hero.y - 200, c.y + 60), zoom: 1.2 };
+    this.time.delayedCall(500, () => c.laughNow());
+    this.time.delayedCall(1300, () => c.laughNow());
+    this.time.delayedCall(2200, () => {
+      this.focus = null;
+      c.tease(this.hero.x + 120 * this.hero.facing, this.hero.y - 470);
     });
   }
 
@@ -269,6 +290,7 @@ export class LevelScene extends Phaser.Scene {
     this.checkBumps(dt);
     this.checkItems();
     this.checkFlags();
+    if (!this.finale && this.crow.atLastPerch && this.crow.x - this.hero.x < FINALE_X) this.startFinale();
     // упал ниже крыши мимо тентов (не должно случаться) — мягко к последнему флагу
     if (body.bottom >= GAME_H - 2 && !this.won) this.controller.respawn(this.respawnX, GROUND_Y);
     this.birds.update(dt);
