@@ -3,6 +3,7 @@
   в лучах, вокруг — три злодея с украденными вещами;
 - он же — заставка Android (res/drawable*/splash.png, по размерам каждого файла, «cover»);
 - иконка приложения: фон — закат с лучами, передний план — Август (голова и плечи),
+  она же — иконки веб-версии (public/icons, экран «Домой» на айфоне);
   адаптивная (ic_launcher_background/foreground) и обычные квадратная и круглая.
 Герой — art/brand_cut (art/sheet.py из art/raw/hero_actions_sheet.png).
 Запуск: python3 art/brand.py <проект>
@@ -139,3 +140,9 @@ for d, m in DENS.items():
         o.save(os.path.join(out, f'{name}.png'), optimize=True)
 full.convert('RGB').save(P('art/icon_preview.png'))
 print('icon ok')
+
+# ---------- иконки веб-версии (экран «Домой» на айфоне, манифест) ----------
+os.makedirs(P('public/icons'), exist_ok=True)
+for n in (180, 192, 512):
+    full.resize((n, n), Image.LANCZOS).convert('RGB').save(P(f'public/icons/icon-{n}.png'), optimize=True)
+print('web icons ok')

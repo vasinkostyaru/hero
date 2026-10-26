@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import Phaser from 'phaser';
 import { feedback } from '../audio/feedback';
 import levelsCfg from '../config/levels.json';
@@ -13,6 +14,8 @@ const STAR_SCALE = 0.36;
  * Открытые — синие со звёздами за лучший результат, закрытые — с замком; следующий
  * непройденный пульсирует ореолом, на нём стоит Август. Тап по открытому — уровень.
  * Карта заполняет экран по высоте; если она шире экрана (16:9), её можно двигать пальцем.
+ * В браузере (веб-версия) в углу — кнопка «на весь экран», если браузер это умеет
+ * (Android, компьютер; на айфоне — нет: там игра на весь экран с экрана «Домой»).
  */
 export class MapScene extends Phaser.Scene {
   private leaving = false;
@@ -89,7 +92,33 @@ export class MapScene extends Phaser.Scene {
     });
     this.input.on(Phaser.Input.Events.POINTER_UP, () => (dragX = null));
 
+    this.addFullscreenButton();
     cam.fadeIn(400, 0, 0, 0);
+  }
+
+  /** Кнопка «на весь экран» — только в браузере, где это возможно, и пока игра не на весь экран. */
+  private addFullscreenButton() {
+    const sm = this.scale;
+    if (Capacitor.isNativePlatform() || !sm.fullscreen.available) return;
+    makeFullscreenIcon(this);
+    const btn = this.add.image(0, 90, 'ui_fullscreen').setScrollFactor(0).setInteractive({ useHandCursor: true });
+    const place = () => btn.setX(sm.width - 90).setVisible(!sm.isFullscreen);
+    place();
+    btn.on(Phaser.Input.Events.POINTER_UP, () => {
+      if (this.moved > 20) return;
+      feedback.button();
+      // только из нажатия: браузер разрешает весь экран лишь в ответ на жест
+      sm.startFullscreen({ navigationUI: 'hide' });
+      (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => {});
+    });
+    sm.on(Phaser.Scale.Events.ENTER_FULLSCREEN, place);
+    sm.on(Phaser.Scale.Events.LEAVE_FULLSCREEN, place);
+    sm.on(Phaser.Scale.Events.RESIZE, place);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      sm.off(Phaser.Scale.Events.ENTER_FULLSCREEN, place);
+      sm.off(Phaser.Scale.Events.LEAVE_FULLSCREEN, place);
+      sm.off(Phaser.Scale.Events.RESIZE, place);
+    });
   }
 
   private play(id: number) {
@@ -99,4 +128,26 @@ export class MapScene extends Phaser.Scene {
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.start('Level', { levelId: id }));
   }
+}
+
+/** Значок «на весь экран»: круглая кнопка в стиле игры, четыре уголка наружу. Один раз в текстуру. */
+function makeFullscreenIcon(scene: Phaser.Scene) {
+  if (scene.textures.exists('ui_fullscreen')) return;
+  const R = 56;
+  const g = scene.make.graphics({}, false);
+  g.translateCanvas(R + 4, R + 4);
+  g.fillStyle(0x1c0f2e, 0.6).fillCircle(0, 0, R);
+  g.lineStyle(5, 0xffe7c4, 0.9).strokeCircle(0, 0, R - 3);
+  g.lineStyle(8, 0xfff3e0, 1);
+  const a = 26;
+  const l = 14;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    g.beginPath();
+    g.moveTo(sx * a, sy * (a - l));
+    g.lineTo(sx * a, sy * a);
+    g.lineTo(sx * (a - l), sy * a);
+    g.strokePath();
+  }
+  g.generateTexture('ui_fullscreen', (R + 4) * 2, (R + 4) * 2);
+  g.destroy();
 }
