@@ -59,6 +59,10 @@ export class Item {
     return this.anchor ? this.anchor().x : this.x;
   }
 
+  get placeY() {
+    return this.anchor ? this.anchor().y : this.y;
+  }
+
   /** Злодей роняет предмет из точки (x, y): летит к своему якорю. */
   drop(x: number, y: number) {
     if (this.state !== 'carried') return;

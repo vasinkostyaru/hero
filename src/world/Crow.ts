@@ -46,8 +46,14 @@ const LEAD_X = 380;
 export interface CarriedItem {
   key: string;
   place: number;
+  /** высота места: Ворон роняет вещь, зависнув над ней (вещь падает только вниз) */
+  placeY: number;
   atPerch?: boolean;
 }
+/** Зависает над местом вещи на столько выше, чтобы уронить её. */
+const DROP_ABOVE = 190;
+/** …но не выше этого (лапы): с крыши верх экрана — y ≈ 0, Ворон должен быть в кадре. */
+const HOVER_MIN_Y = 170;
 type SockState = 'none' | 'drop' | 'rest' | 'taken';
 
 interface Point {
@@ -322,11 +328,26 @@ export class Crow implements WebTarget {
     this.state = 'escape';
   }
 
+  /**
+   * Перелёт на насест i. Если по дороге место следующей вещи — сначала подлетает
+   * и зависает над ним, роняет вещь вниз и только потом летит дальше (after).
+   */
   private flyTo(i: number, p: Point) {
     this.perch = i;
     const cur = { x: this.root.x, y: this.root.y };
+    const next = this.carried[0];
+    if (next && !next.atPerch && (next.place - cur.x) * (p.x - cur.x) > 0 && Math.abs(next.place - cur.x) < Math.abs(p.x - cur.x)) {
+      // клюв (BEAK.y над лапами) остаётся выше места — вещь падает только вниз
+      const over = { x: next.place, y: Math.min(Math.max(next.placeY - DROP_ABOVE, HOVER_MIN_Y), next.placeY - BEAK.y - 30) };
+      this.after = { i, p };
+      this.startFlight(over, over, Math.max(0.7, Math.hypot(over.x - cur.x, over.y - cur.y) / FLY_SPEED));
+      return;
+    }
     this.startFlight(p, p, Math.max(0.9, Math.hypot(p.x - cur.x, p.y - cur.y) / FLY_SPEED));
   }
+
+  /** куда лететь, уронив вещь над её местом */
+  private after: { i: number; p: Point } | null = null;
 
   /** Перелёт по дуге вверх. */
   private startFlight(to: Point, end: Point, dur: number) {
@@ -367,9 +388,14 @@ export class Crow implements WebTarget {
     this.root.setRotation(
       loop > 0 && loop < 1 ? -loop * Math.PI * 2 * this.facing : Phaser.Math.Clamp((this.root.y - prevY) * 0.02, -0.3, 0.3) * this.facing,
     );
-    // пролетает над местом следующей вещи — роняет её туда
-    const next = this.carried[0];
-    if (next && !next.atPerch && (this.root.x - next.place) * this.facing >= 0 && Math.abs(this.root.x - next.place) < 400) this.dropCarried();
+    // завис над местом вещи — роняет её вниз и летит дальше, не садясь
+    if (u >= 1 && this.after) {
+      const a = this.after;
+      this.after = null;
+      this.dropCarried();
+      this.flyTo(a.i, a.p);
+      return;
+    }
     if (u >= 1 && this.state === 'tease') {
       feedback.caw(1.15);
       this.escape();

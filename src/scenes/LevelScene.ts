@@ -123,7 +123,7 @@ export class LevelScene extends Phaser.Scene {
     // Ворон несёт вещи уровня и роняет каждую в её место; шарф — улетая с насеста над стройкой
     const dropAtPerch = new Set(this.level.perches.map((p) => p.drop));
     this.crow = new Crow(this, this.level.perches, env, glowLayer, {
-      items: this.level.items.filter((i) => i.state === 'carried').map((i) => ({ key: i.key, place: i.place, atPerch: dropAtPerch.has(i.key) })),
+      items: this.level.items.filter((i) => i.state === 'carried').map((i) => ({ key: i.key, place: i.place, placeY: i.placeY, atPerch: dropAtPerch.has(i.key) })),
       onDrop: (key, x, y) => this.level.items.find((i) => i.key === key)?.drop(x, y),
       onEscape: () => this.win(),
     });
