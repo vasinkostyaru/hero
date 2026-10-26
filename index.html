@@ -16,10 +16,30 @@
     <style>
       html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; touch-action: none; }
       #game { width: 100vw; height: 100vh; }
+      /* телефон держат вертикально (веб-версия; приложение и так только горизонтально) —
+         игра горизонтальная: просим повернуть, без текста — телефон в руке поворачивается */
+      #rotate { display: none; position: fixed; inset: 0; z-index: 10; background: #2a1d4a; align-items: center; justify-content: center; }
+      #rotate svg { width: 46vmin; height: 46vmin; }
+      #rotate .phone { transform-origin: 60px 60px; animation: turn 2.4s ease-in-out infinite; }
+      #rotate .arrow { animation: blink 2.4s ease-in-out infinite; }
+      @keyframes turn { 0%, 20% { transform: rotate(0deg); } 55%, 85% { transform: rotate(-90deg); } 100% { transform: rotate(0deg); } }
+      @keyframes blink { 0%, 15% { opacity: 1; } 50%, 90% { opacity: 0.15; } 100% { opacity: 1; } }
+      @media (orientation: portrait) { #rotate { display: flex; } }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="rotate">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <path class="arrow" d="M 96 34 A 44 44 0 0 0 40 18" fill="none" stroke="#ffc871" stroke-width="6" stroke-linecap="round" />
+        <path class="arrow" d="M 40 18 l 10 -9 M 40 18 l 12 6" fill="none" stroke="#ffc871" stroke-width="6" stroke-linecap="round" />
+        <g class="phone">
+          <rect x="38" y="22" width="44" height="76" rx="8" fill="#3a2456" stroke="#ffe7c4" stroke-width="5" />
+          <circle cx="60" cy="88" r="3.5" fill="#ffe7c4" />
+          <path d="M 52 50 l 14 10 l -14 10 z" fill="#ffc871" />
+        </g>
+      </svg>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
