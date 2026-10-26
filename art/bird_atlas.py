@@ -47,6 +47,12 @@ def clear_holes(img):
     return Image.fromarray(a.astype(np.uint8))
 
 
+def feet(a):
+    """Голубь ходит: опора — линия лап (низ силуэта), по X — центр масс силуэта."""
+    ys, xs = np.where(a[..., 3] > 128)
+    return xs.mean(), ys.max()
+
+
 # scale — до игрового размера; body — центр тела относительно опорной точки (пиксели листа)
 BIRDS = {
     'seagull': dict(cut='art/seagull_cut', out='public/assets/chars/enemies', scale=0.4, anchor=beak_base,
@@ -55,6 +61,11 @@ BIRDS = {
     'crow': dict(cut='art/crow_cut', out='public/assets/chars/crow', scale=0.58, anchor=goggle_lens,
                  body=(-110, 85), frames=['fly_1', 'fly_2', 'fly_3', 'fly_4', 'land', 'takeoff'], centered=[],
                  holes=True),
+    # голубь: глаз на листе ~9.5% крупнее, чем на pigeon.png (в игре × 0.3) → 0.3 / 1.095;
+    # центр холста — 170 px листа над лапами
+    'pigeon': dict(cut='art/pigeon_cut', out='public/assets/chars/enemies', scale=0.274, anchor=feet,
+                   body=(0, -170), frames=['walk_1', 'walk_2', 'walk_3', 'walk_4', 'peck', 'angry'], centered=[],
+                   holes=True),
 }
 cfg = BIRDS[bird]
 cut = os.path.join(root, cfg['cut'])
@@ -97,11 +108,12 @@ for i, name in enumerate(names):
 sheet.save(os.path.join(out, f'{bird}_atlas.png'), optimize=True)
 with open(os.path.join(out, f'{bird}_atlas.json'), 'w') as f:
     json.dump(atlas, f, indent=1)
-print('frame', fw, 'x', fh, 'sheet', sheet.size)
+print('frame', fw, 'x', fh, 'sheet', sheet.size, 'anchor below center', round(-cfg['body'][1] * SCALE, 1))
 
 # превью: цикл взмахов на закатном фоне
 bg = (70, 40, 90, 255)
-seq = ['fly_1', 'fly_2', 'fly_3', 'fly_4'] * 3 + [n for n in names if not n.startswith('fly_') for _ in range(5)]
+loop = [n for n in names if n.startswith(('fly_', 'walk_'))]
+seq = loop * 3 + [n for n in names if n not in loop for _ in range(5)]
 gif = []
 for name in seq:
     i = names.index(name)

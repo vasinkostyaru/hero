@@ -32,12 +32,6 @@ export type CritterState = 'live' | 'wrap' | 'cocoon' | 'gone';
 const WRAP_MS = 320;
 const VANISH_S = 3;
 
-/** Размер картинки в экранном масштабе (уменьшенная копия текстуры). */
-export function partSize(scene: Phaser.Scene, key: string, scale: number) {
-  const src = scene.textures.get(scaledTexture(scene, key, scale)).getSourceImage();
-  return { w: src.width, h: src.height };
-}
-
 /**
  * Шалун: живёт по-своему (live), а попадание паутиной у всех одинаковое —
  * белые нити быстро наматываются, подмена на кокон, кокон падает с вращением,

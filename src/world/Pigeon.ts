@@ -1,27 +1,32 @@
 import Phaser from 'phaser';
 import { feedback } from '../audio/feedback';
-import { Critter, partSize, type CritterEnv } from './Critter';
-import { scaledTexture } from './textures';
+import { Critter, type CritterEnv } from './Critter';
 
-/** Голубь ~1/2 роста героя: pigeon.png (372 px) × 0.3 ≈ 112 px. */
-const SCALE = 0.3;
+/** Кокон: pigeon_cocoon.png (386 px) × 0.3 ≈ 116 px; кадры (pigeon_atlas) уже в игровом размере, ~105 px. */
+const COCOON_SCALE = 0.3;
+/** Лапы в кадрах атласа — на столько ниже центра кадра (art/bird_atlas.py). */
+const FEET_BELOW = 46.6;
+/** Центр тела над лапами — сюда целится паутина. */
+const BODY_H = 100;
 const WALK = 70;
-/** Заметил героя на своей дорожке — идёт на него быстрее, надувшись. */
+const WALK_FPS = 8;
+/** Заметил героя на своей дорожке — сердится и идёт на него быстрее, надувшись. */
 const CHARGE = 210;
 const NOTICE = 380;
 
 /**
- * Голубь ходит вперевалку туда-сюда по крыше или платформе, иногда останавливается поклевать.
- * Заметил героя рядом — надувается и бодается: мягко отталкивает (без урона).
+ * Голубь ходит туда-сюда по крыше или платформе (walk_1..4, голова ходит вперёд-назад),
+ * иногда останавливается поклевать (peck). Заметил героя рядом — надувается (angry)
+ * и бодается: мягко отталкивает (без урона).
  */
 export class Pigeon extends Critter {
-  private img: Phaser.GameObjects.Image;
-  private h: number;
+  private img: Phaser.GameObjects.Sprite;
   private dir = Math.random() < 0.5 ? 1 : -1;
   private pause = 0;
   private peckT = -1;
   private nextPeck = Phaser.Math.FloatBetween(2, 5);
-  private stepPhase = 0;
+  private angry = 0;
+  private noticed = false;
   private puff = 0;
 
   constructor(
@@ -32,11 +37,18 @@ export class Pigeon extends Critter {
     private maxX: number,
     env: CritterEnv,
   ) {
-    const { h } = partSize(scene, 'pigeon', SCALE);
-    super(scene, x, floorY - h / 2, env, { key: 'pigeon_cocoon', scale: SCALE, wrap: { x: 0, y: 6, rx: 46, ry: 26 } });
-    this.h = h;
-    // origin у лап: покачивание вперевалку — вокруг лап, а не центра
-    this.img = scene.add.image(0, h / 2, scaledTexture(scene, 'pigeon', SCALE)).setOrigin(0.5, 1);
+    super(scene, x, floorY - BODY_H / 2, env, { key: 'pigeon_cocoon', scale: COCOON_SCALE, wrap: { x: 0, y: 6, rx: 46, ry: 26 } });
+    if (!scene.anims.exists('pigeon_walk')) {
+      scene.anims.create({
+        key: 'pigeon_walk',
+        frames: scene.anims.generateFrameNames('pigeon', { prefix: 'walk_', start: 1, end: 4 }),
+        frameRate: WALK_FPS,
+        repeat: -1,
+      });
+    }
+    // origin у лап: покачивание и надувание — вокруг лап, а не центра
+    this.img = scene.add.sprite(0, BODY_H / 2, 'pigeon', 'walk_2');
+    this.img.setOrigin(0.5, 0.5 + FEET_BELOW / this.img.height);
     this.addParts([this.img]);
   }
 
@@ -45,8 +57,9 @@ export class Pigeon extends Critter {
   }
 
   bumped() {
-    // боднул — гордо стоит, потом уходит в другую сторону
+    // боднул — гордо стоит надувшись, потом уходит в другую сторону
     this.pause = 1.1;
+    this.angry = 1.1;
     this.peckT = -1;
     this.dir = -this.dir;
     feedback.coo();
@@ -54,10 +67,21 @@ export class Pigeon extends Critter {
 
   protected live(dt: number) {
     const hero = this.env.hero;
-    const feetY = this.y + this.h / 2;
+    const feetY = this.y + BODY_H / 2;
     const dx = hero.x - this.x;
     const onPath = Math.abs(hero.y - feetY) < 60 && hero.x > this.minX - 80 && hero.x < this.maxX + 80;
-    const charging = this.pause <= 0 && onPath && Math.abs(dx) < NOTICE;
+    const sees = onPath && Math.abs(dx) < NOTICE;
+    this.angry = Math.max(0, this.angry - dt);
+    if (!sees) this.noticed = false;
+    // заметил — сначала на миг надувается и сердится, потом идёт бодаться
+    if (sees && !this.noticed && this.pause <= 0) {
+      this.noticed = true;
+      this.dir = Math.sign(dx) || this.dir;
+      this.pause = 0.4;
+      this.angry = 0.4;
+      this.peckT = -1;
+    }
+    const charging = this.pause <= 0 && sees;
 
     let speed = 0;
     if (this.pause > 0) {
@@ -86,20 +110,28 @@ export class Pigeon extends Critter {
       }
     }
     this.facing = this.dir;
-    this.img.setFlipX(this.dir < 0);
+    this.pickFrame(speed);
 
-    // вперевалку: шаги чаще, когда идёт быстрее; на месте — только дыхание
-    this.stepPhase += dt * speed * 0.13;
-    const moving = speed > 0 ? 1 : 0;
-    let rot = Math.sin(this.stepPhase) * 0.08 * moving;
-    const hop = Math.abs(Math.sin(this.stepPhase)) * 5 * moving;
-    if (this.peckT >= 0 && this.pause > 0) rot = this.dir * 0.4 * Math.abs(Math.sin(this.peckT * 7));
-    this.puff += ((charging ? 1 : 0) - this.puff) * Math.min(1, dt * 6);
-    rot += this.dir * 0.12 * this.puff;
-    const breath = 1 + 0.015 * Math.sin(this.t * 3);
+    // надувается, пока сердится и бодается; на месте — лёгкое дыхание
+    this.puff += ((charging || this.angry > 0 ? 1 : 0) - this.puff) * Math.min(1, dt * 6);
+    const breath = speed > 0 ? 1 : 1 + 0.015 * Math.sin(this.t * 3);
     this.img
-      .setRotation(rot)
-      .setScale(1 + 0.08 * this.puff, (1 + 0.08 * this.puff) * breath)
-      .setY(this.h / 2 - hop);
+      .setRotation(this.dir * 0.08 * this.puff * (speed > 0 ? 1 : 0))
+      .setScale(1 + 0.06 * this.puff, (1 + 0.06 * this.puff) * breath);
+  }
+
+  private pickFrame(speed: number) {
+    const s = this.img;
+    s.setFlipX(this.dir < 0);
+    if (speed > 0) {
+      if (!s.anims.isPlaying) s.play('pigeon_walk');
+      s.anims.timeScale = speed / WALK;
+      return;
+    }
+    s.stop();
+    if (this.angry > 0) s.setFrame('angry');
+    // клюёт дважды: наклон — выпрямился — наклон
+    else if (this.peckT >= 0) s.setFrame(Math.sin(this.peckT * 7) > 0 ? 'peck' : 'walk_2');
+    else s.setFrame('walk_2');
   }
 }

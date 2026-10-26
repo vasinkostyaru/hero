@@ -18,10 +18,11 @@ export class BootScene extends Phaser.Scene {
     for (const key of ['tex_brick', 'tex_climb', 'roof_edge']) this.load.image(key, `world/${key}.png`);
     for (const key of ['water_tower', 'chimney', 'antenna', 'ac_unit', 'crate', 'lamp', 'checkpoint_flag']) this.load.image(key, `world/props/${key}.png`);
     for (const key of ['drone_body', 'drone_propeller', 'drone_cocoon']) this.load.image(key, `world/drone/${key}.png`);
-    for (const key of ['pigeon', 'pigeon_cocoon', 'seagull_cocoon', 'drone2', 'drone2_cocoon']) this.load.image(key, `chars/enemies/${key}.png`);
+    for (const key of ['pigeon_cocoon', 'seagull_cocoon', 'drone2_body', 'drone2_propeller', 'drone2_cocoon']) this.load.image(key, `chars/enemies/${key}.png`);
     for (const key of ['crow_laugh', 'crow_dizzy', 'sock']) this.load.image(key, `chars/crow/${key}.png`);
     this.load.atlas('seagull', 'chars/enemies/seagull_atlas.png', 'chars/enemies/seagull_atlas.json');
     this.load.atlas('crow', 'chars/crow/crow_atlas.png', 'chars/crow/crow_atlas.json');
+    this.load.atlas('pigeon', 'chars/enemies/pigeon_atlas.png', 'chars/enemies/pigeon_atlas.json');
     this.load.atlas('hero', 'hero2/hero_atlas.png', 'hero2/hero_atlas.json');
   }
 
