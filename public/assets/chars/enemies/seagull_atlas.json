@@ -1,0 +1,132 @@
+{
+ "frames": {
+  "fly_1": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "sourceSize": {
+    "w": 314,
+    "h": 287
+   }
+  },
+  "fly_2": {
+   "frame": {
+    "x": 314,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "sourceSize": {
+    "w": 314,
+    "h": 287
+   }
+  },
+  "fly_3": {
+   "frame": {
+    "x": 628,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "sourceSize": {
+    "w": 314,
+    "h": 287
+   }
+  },
+  "fly_4": {
+   "frame": {
+    "x": 942,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "sourceSize": {
+    "w": 314,
+    "h": 287
+   }
+  },
+  "glide": {
+   "frame": {
+    "x": 1256,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "sourceSize": {
+    "w": 314,
+    "h": 287
+   }
+  },
+  "dive": {
+   "frame": {
+    "x": 1570,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 314,
+    "h": 287
+   },
+   "sourceSize": {
+    "w": 314,
+    "h": 287
+   }
+  }
+ },
+ "meta": {
+  "image": "seagull_atlas.png",
+  "size": {
+   "w": 1884,
+   "h": 287
+  },
+  "scale": "1"
+ }
+}

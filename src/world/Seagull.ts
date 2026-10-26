@@ -1,21 +1,24 @@
 import Phaser from 'phaser';
 import { feedback } from '../audio/feedback';
 import { Critter, type CritterEnv } from './Critter';
-import { scaledTexture } from './textures';
-
-/** Чайка ~2/3 роста героя: seagull.png (382 px) × 0.38 ≈ 145 px. */
-const SCALE = 0.38;
+/** Кокон — по старой картинке seagull_cocoon.png (387 px) × 0.38 ≈ 147 px; кадры полёта уже в игровом размере. */
+const COCOON_SCALE = 0.38;
 const PATROL_V = 170;
+const FLAP_FPS = 10;
 const WARN_T = 0.55;
 const DIVE_T = 1.25;
 
 /**
- * Чайка кружит высоко над крышей. Заметив героя внизу, кричит («!» над головой),
+ * Чайка кружит высоко над крышей: машет крыльями (seagull_atlas: fly_1..4), иногда парит (glide).
+ * Заметив героя внизу, кричит («!» над головой),
  * затем пикирует по дуге через то место, где он стоит, и снова набирает высоту.
  * Задела — героя мягко отбрасывает (без урона). Сбить можно и в полёте, и в пике.
  */
 export class Seagull extends Critter {
-  private img: Phaser.GameObjects.Image;
+  private img: Phaser.GameObjects.Sprite;
+  /** сколько ещё махать / парить в патруле */
+  private flapLeft = Phaser.Math.FloatBetween(1.5, 2.5);
+  private glideLeft = 0;
   private bang: Phaser.GameObjects.Graphics;
   private mode: 'patrol' | 'warn' | 'dive' = 'patrol';
   private modeT = 0;
@@ -32,8 +35,17 @@ export class Seagull extends Critter {
     private range: number,
     env: CritterEnv,
   ) {
-    super(scene, cx, altY, env, { key: 'seagull_cocoon', scale: SCALE, wrap: { x: 0, y: 4, rx: 66, ry: 32 } });
-    this.img = scene.add.image(0, 0, scaledTexture(scene, 'seagull', SCALE));
+    super(scene, cx, altY, env, { key: 'seagull_cocoon', scale: COCOON_SCALE, wrap: { x: 10, y: -4, rx: 66, ry: 32 } });
+    if (!scene.anims.exists('gull_flap')) {
+      scene.anims.create({
+        key: 'gull_flap',
+        frames: scene.anims.generateFrameNames('seagull', { prefix: 'fly_', start: 1, end: 4 }),
+        frameRate: FLAP_FPS,
+        repeat: -1,
+      });
+    }
+    this.img = scene.add.sprite(0, 0, 'seagull', 'fly_1').play('gull_flap');
+    this.img.anims.setProgress(Math.random());
     this.bang = scene.add.graphics().setVisible(false);
     drawBang(this.bang);
     this.addParts([this.img, this.bang]);
@@ -49,7 +61,7 @@ export class Seagull extends Critter {
     const hero = this.env.hero;
     const hx = hero.x;
     const hy = hero.y - 100;
-    let flapRate = 11;
+    let flap = 1; // скорость взмахов: 0 — парит, 1 — обычно, больше — часто
 
     switch (this.mode) {
       case 'patrol': {
@@ -58,6 +70,15 @@ export class Seagull extends Critter {
         if (r.x < this.cx - this.range) this.dir = 1;
         r.y += (this.altY + Math.sin(this.t * 1.3) * 16 - r.y) * Math.min(1, dt * 2);
         r.rotation *= 1 - Math.min(1, dt * 4);
+        // помахала — парит, попарила — снова машет
+        if (this.glideLeft > 0) {
+          this.glideLeft -= dt;
+          flap = 0;
+          if (this.glideLeft <= 0) this.flapLeft = Phaser.Math.FloatBetween(1.5, 2.5);
+        } else {
+          this.flapLeft -= dt;
+          if (this.flapLeft <= 0) this.glideLeft = Phaser.Math.FloatBetween(0.8, 1.4);
+        }
         this.cd -= dt;
         const dx = Math.abs(hx - r.x);
         if (this.cd <= 0 && dx < 480 && dx > 120 && hy > r.y + 150) {
@@ -70,7 +91,7 @@ export class Seagull extends Critter {
       }
       case 'warn': {
         // зависла, часто машет и кричит — «!» выпрыгивает над головой
-        flapRate = 18;
+        flap = 1.7;
         const pop = Math.min(1, this.modeT / 0.12);
         this.bang.setVisible(true).setScale(pop * (1 + 0.15 * Math.sin(this.modeT * 30)));
         if (this.modeT >= WARN_T) {
@@ -85,7 +106,6 @@ export class Seagull extends Critter {
         break;
       }
       case 'dive': {
-        flapRate = 4; // крылья почти сложены
         const u = Math.min(1, this.modeT / DIVE_T);
         const s = 0.5 - 0.5 * Math.cos(Math.PI * u);
         const prev = { x: r.x, y: r.y };
@@ -96,7 +116,19 @@ export class Seagull extends Critter {
         r.y = a * this.p0.y + b * this.p1.y + c * this.p2.y;
         const vy = r.y - prev.y;
         const vx = Math.abs(r.x - prev.x) || 1e-3;
-        r.rotation = Phaser.Math.Clamp(Math.atan2(vy, vx) * 0.6, -0.7, 0.7) * this.dir;
+        // вниз — кадр пике (уже наклонён), внизу — скольжение, вверх — часто машет
+        const angle = Phaser.Math.Clamp(Math.atan2(vy, vx) * 0.6, -0.7, 0.7);
+        if (s < 0.42) {
+          flap = -1;
+          this.img.setFrame('dive');
+          r.rotation = 0;
+        } else if (s < 0.6) {
+          flap = 0;
+          r.rotation = angle * this.dir;
+        } else {
+          flap = 1.7;
+          r.rotation = angle * this.dir;
+        }
         if (u >= 1) {
           this.mode = 'patrol';
           this.cd = Phaser.Math.FloatBetween(3.5, 5.5);
@@ -107,9 +139,24 @@ export class Seagull extends Critter {
 
     this.facing = this.dir;
     this.img.setFlipX(this.dir < 0);
-    this.bang.setX(this.dir * 34).setY(-78);
-    // взмахи: картинка с раскрытыми крыльями чуть сплющивается в ритм
-    this.img.setScale(1, 1 - 0.12 * (0.5 + 0.5 * Math.sin(this.t * flapRate)));
+    this.bang.setX(this.dir * 70).setY(-80);
+    this.setFlap(flap);
+  }
+
+  /** flap: -1 — кадр уже выставлен (пике), 0 — парит, > 0 — машет с этой скоростью. */
+  private setFlap(flap: number) {
+    const a = this.img.anims;
+    if (flap < 0) {
+      a.pause();
+      return;
+    }
+    if (flap === 0) {
+      a.pause();
+      this.img.setFrame('glide');
+      return;
+    }
+    a.timeScale = flap;
+    if (a.isPaused) a.resume();
   }
 }
 

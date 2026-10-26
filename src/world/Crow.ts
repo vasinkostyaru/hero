@@ -5,8 +5,12 @@ import { scaledTexture } from './textures';
 
 /** Ворон ~ростом с героя: crow_laugh.png (444 px) × 0.48 ≈ 213 px. */
 const LAUGH_SCALE = 0.48;
-/** В полёте и лёжа (и носок) — чуть мельче: на этих картинках он нарисован крупнее. */
+/** Лёжа (и носок) — чуть мельче: на этих картинках он нарисован крупнее. Кадры полёта (crow_atlas) уже в игровом размере. */
 const FLY_SCALE = 0.45;
+const FLAP_FPS = 12;
+/** В начале перелёта — кадр взлёта, в конце — посадки, с. */
+const TAKEOFF_T = 0.2;
+const LANDING_T = 0.28;
 const HITS = 3;
 /** Герой подошёл ближе — Ворон перелетает на другое место. */
 const FLEE_X = 320;
@@ -35,7 +39,7 @@ interface Point {
 export class Crow implements WebTarget {
   readonly root: Phaser.GameObjects.Container;
   private laugh: Phaser.GameObjects.Image;
-  private fly: Phaser.GameObjects.Image;
+  private fly: Phaser.GameObjects.Sprite;
   private dizzy: Phaser.GameObjects.Image;
   private stars: Phaser.GameObjects.Graphics;
   private sock: Phaser.GameObjects.Image;
@@ -69,7 +73,16 @@ export class Crow implements WebTarget {
   ) {
     const p = perches[0];
     this.laugh = scene.add.image(0, 0, scaledTexture(scene, 'crow_laugh', LAUGH_SCALE)).setOrigin(0.5, 1);
-    this.fly = scene.add.image(0, -100, scaledTexture(scene, 'crow_fly', FLY_SCALE)).setOrigin(0.5, 0.6).setVisible(false);
+    if (!scene.anims.exists('crow_flap')) {
+      scene.anims.create({
+        key: 'crow_flap',
+        frames: scene.anims.generateFrameNames('crow', { prefix: 'fly_', start: 1, end: 4 }),
+        frameRate: FLAP_FPS,
+        repeat: -1,
+      });
+    }
+    // центр кадров атласа — центр тела, он примерно в 100 px над лапами
+    this.fly = scene.add.sprite(0, -100, 'crow', 'takeoff').setVisible(false);
     this.dizzy = scene.add.image(0, 0, scaledTexture(scene, 'crow_dizzy', FLY_SCALE)).setOrigin(0.5, 1).setVisible(false);
     this.stars = scene.add.graphics();
     this.root = scene.add.container(p.x, p.y, [this.laugh, this.fly, this.dizzy, this.stars]).setDepth(8);
@@ -215,14 +228,21 @@ export class Crow implements WebTarget {
     const prevY = this.root.y;
     this.root.x = a * this.from.x + b * this.ctrl.x + c * this.to.x;
     this.root.y = a * this.from.y + b * this.ctrl.y + c * this.to.y;
-    // взмахи крыльев и наклон по ходу
-    this.fly
-      .setScale(1, 1 - 0.14 * (0.5 + 0.5 * Math.sin(this.t * 13)))
-      .setRotation(Phaser.Math.Clamp((this.root.y - prevY) * 0.02, -0.3, 0.3) * this.facing);
+    // взлёт → взмахи → посадка (лапы вперёд), наклон по ходу
+    const f = this.fly;
+    const left = this.flyDur - this.stateT;
+    if (this.stateT < TAKEOFF_T || left < LANDING_T) {
+      f.stop();
+      f.setFrame(this.stateT < TAKEOFF_T ? 'takeoff' : 'land');
+    } else if (!f.anims.isPlaying) {
+      f.play('crow_flap');
+    }
+    f.setRotation(Phaser.Math.Clamp((this.root.y - prevY) * 0.02, -0.3, 0.3) * this.facing);
     if (u >= 1) {
       this.state = 'perch';
       this.stateT = 0;
-      this.fly.setVisible(false);
+      f.stop();
+      f.setVisible(false);
       this.laugh.setVisible(true);
       this.kick(-0.14);
       // сел — и сразу дразнится
