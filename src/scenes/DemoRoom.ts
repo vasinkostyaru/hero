@@ -187,6 +187,7 @@ export class DemoRoom extends Phaser.Scene {
 
     // ввод → физика и позиция героя (в одном месте) → всё остальное; камера следует уже за итогом
     this.touch.update();
+    this.level.update(dt, this.controller.body);
     this.controller.update(dt);
     for (const c of this.critters) c.update(dt);
     this.critters = this.critters.filter((c) => c.state !== 'gone');

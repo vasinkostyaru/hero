@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GROUND_Y, WORLD_W } from '../config/game';
+import { Bouncer, Cradle, POST_COLOR, Trolley, addAwning, addClothesline, addLongPlatform, meta, type PlatformLook } from './Platforms';
 import { addTiled, scaledTexture } from './textures';
 
 export type SolidKind = 'roof' | 'platform' | 'wall' | 'box';
@@ -13,9 +14,15 @@ export interface Solid {
   kind: SolidKind;
   /** по такой стене можно лазать — кирпич с плющом */
   climbable?: boolean;
+  /** вид платформы: доски, леса, балка или балкон (без — кирпич); y — где стоит герой */
+  look?: PlatformLook | 'balcony';
 }
 
 const PLATFORM_H = 64;
+/** Платформы из набора — перед декором крыши (6), но за героем и шалунами. */
+const PLATFORM_DEPTH = 7;
+/** ширина картинки балкона в атласе platforms */
+const BALCONY_W = 208;
 /** Тон кирпича под палитру заката: чуть темнее и в сиреневый, как всё, что стоит в тени. */
 const BRICK_TINT = 0xd9c6d6;
 const RIM_COLOR = 0xffb46a;
@@ -24,16 +31,19 @@ const OUTLINE = 0x1c0c2a;
 const CRATE_SCALE = 0.42;
 
 /**
- * Демо-комната (≈2.5 экрана): крыша по всей длине, ящик-ступенька, 3 платформы,
- * высокая стена с плющом и узкий колодец из двух стен для прыжков от стены к стене.
+ * Демо-комната (≈2.5 экрана): крыша по всей длине, ящик-ступенька, мостик из досок,
+ * балкон у высокой стены с плющом, балка с тележкой, леса, люлька и узкий колодец
+ * из двух стен для прыжков от стены к стене. Бельё у старта и тент на колодце — батуты.
  */
 const SOLIDS: Solid[] = [
   { x: 0, y: GROUND_Y, w: WORLD_W, h: 400, kind: 'roof' },
   { x: 860, y: GROUND_Y - 110, w: 120, h: 110, kind: 'box' },
-  { x: 1100, y: GROUND_Y - 190, w: 300, h: PLATFORM_H, kind: 'platform' },
+  { x: 1100, y: GROUND_Y - 190, w: 300, h: PLATFORM_H, kind: 'platform', look: 'wood' },
+  // балкон прижат к стене слева: правый (отрезанный) край картинки — у стены
+  { x: 1650 - BALCONY_W, y: GROUND_Y - 300, w: BALCONY_W - 8, h: PLATFORM_H, kind: 'platform', look: 'balcony' },
   { x: 1650, y: GROUND_Y - 575, w: 110, h: 575, kind: 'wall', climbable: true },
-  { x: 1900, y: GROUND_Y - 425, w: 350, h: PLATFORM_H, kind: 'platform' },
-  { x: 2550, y: GROUND_Y - 215, w: 300, h: PLATFORM_H, kind: 'platform' },
+  { x: 1900, y: GROUND_Y - 425, w: 350, h: PLATFORM_H, kind: 'platform', look: 'beam' },
+  { x: 2550, y: GROUND_Y - 215, w: 300, h: PLATFORM_H, kind: 'platform', look: 'scaffold' },
   // колодец: щель 170 px между стенами — прыгать от одной к другой
   { x: 3250, y: GROUND_Y - 615, w: 90, h: 615, kind: 'wall', climbable: true },
   { x: 3510, y: GROUND_Y - 545, w: 90, h: 545, kind: 'wall', climbable: true },
@@ -62,6 +72,13 @@ export const LEVEL = {
   ],
   lampX: 4020,
   flagX: 4460,
+  /** люлька: x — левый край, top/bottom — крайние линии пола, period — полный круг, с */
+  cradles: [{ x: 2930, top: GROUND_Y - 520, bottom: GROUND_Y - 40, period: 7 }],
+  clotheslines: [{ x: 560 }],
+  /** тент на правом боку правой стены колодца: подбрасывает к её верху */
+  awnings: [{ wallRight: 3600, y: GROUND_Y - 270 }],
+  /** тележка с крюком под балкой (вторая платформа) */
+  trolleys: [{ minX: 1980, maxX: 2200, beamTop: GROUND_Y - 425 - 5 }],
 };
 
 /**
@@ -69,8 +86,11 @@ export const LEVEL = {
  * Платформы — «односторонние»: снизу сквозь них можно запрыгнуть, сверху стоишь.
  */
 export class Level {
-  readonly solids = SOLIDS;
+  readonly solids: Solid[] = SOLIDS.map((s) => ({ ...s }));
   readonly bodies: Phaser.Physics.Arcade.StaticBody[] = [];
+  readonly bouncers: Bouncer[] = [];
+  private cradles: { cradle: Cradle; solid: Solid }[] = [];
+  private trolleys: Trolley[] = [];
 
   constructor(private scene: Phaser.Scene) {
     makeShadeTextures(scene);
@@ -84,6 +104,37 @@ export class Level {
       }
       this.bodies.push(body);
     }
+    for (const c of LEVEL.cradles) {
+      const cradle = new Cradle(scene, c.x, c.top, c.bottom, c.period);
+      // пол люльки — тоже опора: для тени героя и падающих коконов
+      const solid: Solid = { ...cradle.floor, h: 24, kind: 'platform' };
+      this.solids.push(solid);
+      this.bodies.push(cradle.body);
+      this.cradles.push({ cradle, solid });
+    }
+    for (const c of LEVEL.clotheslines) this.bouncers.push(addClothesline(scene, c.x, GROUND_Y));
+    for (const a of LEVEL.awnings) this.bouncers.push(addAwning(scene, a.wallRight, a.y));
+    for (const t of LEVEL.trolleys) this.trolleys.push(new Trolley(scene, t.minX, t.maxX, t.beamTop));
+  }
+
+  /** Движущееся: люльки (и герой на них), пружинящие батуты, тележки. До шага героя. */
+  update(dt: number, hero: Phaser.Physics.Arcade.Body) {
+    for (const { cradle, solid } of this.cradles) {
+      const f = cradle.floor;
+      const riding =
+        hero.blocked.down && Math.abs(hero.bottom - f.y) < 6 && hero.right > f.x && hero.left < f.x + f.w;
+      cradle.update(dt);
+      solid.y = f.y;
+      // стоим на полу — едем вместе с ним
+      if (riding) {
+        hero.position.y += cradle.dy;
+        hero.prev.y += cradle.dy;
+        hero.prevFrame.y += cradle.dy;
+        hero.updateCenter();
+      }
+    }
+    for (const b of this.bouncers) b.update(dt);
+    for (const t of this.trolleys) t.update(dt);
   }
 
   /** Стены и ящик — в них прилипает паутина. */
@@ -133,6 +184,17 @@ export class Level {
     );
   }
 
+  /** Опоры от низа платформы до крыши, цвета материала, с тёплым бликом. */
+  private addPosts(s: Solid, color: number, bottom: number) {
+    const add = this.scene.add;
+    for (const k of [0.16, 0.84]) {
+      const px = s.x + s.w * k;
+      add.rectangle(px - 6, bottom, 12, GROUND_Y - bottom, color).setOrigin(0, 0).setDepth(4);
+      add.rectangle(px + 3, bottom, 3, GROUND_Y - bottom, RIM_COLOR, 0.25).setOrigin(0, 0).setDepth(4).setBlendMode(Phaser.BlendModes.ADD);
+      add.rectangle(px - 10, GROUND_Y - 10, 20, 12, color).setOrigin(0, 0).setDepth(4);
+    }
+  }
+
   private draw(s: Solid) {
     const add = this.scene.add;
     const edgeH = 148 * 0.5;
@@ -145,6 +207,15 @@ export class Level {
         return;
       }
       case 'platform': {
+        if (s.look === 'balcony') {
+          add.image(s.x, s.y - meta(this.scene).special.balcony.stand!, 'platforms', 'balcony').setOrigin(0, 0).setDepth(PLATFORM_DEPTH);
+          return;
+        }
+        if (s.look) {
+          s.w = addLongPlatform(this.scene, s.look, s.x, s.y, s.w, PLATFORM_DEPTH);
+          this.addPosts(s, POST_COLOR[s.look], s.y + meta(this.scene).long[s.look].h - meta(this.scene).long[s.look].stand);
+          return;
+        }
         // опоры до крыши — платформа читается как конструкция на крыше, а не плитка в воздухе
         for (const k of [0.16, 0.84]) {
           const px = s.x + s.w * k;

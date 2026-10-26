@@ -56,6 +56,8 @@ export class HeroController {
   private jumpT = 99;
   private fallV = 0;
   private stun = 0;
+  /** подбросило батутом — высоту не обрезаем, даже если прыжок не держат */
+  private bounced = false;
 
   /** Приземление: скорость падения, px/с (для тряски камеры с высоты). */
   onLand: (fallSpeed: number) => void = () => {};
@@ -133,6 +135,24 @@ export class HeroController {
     if (side !== 0 && (blocked || this.level.blockedAt(side, b.left, b.right, b.top, b.bottom))) this.vx = 0;
     b.setVelocityX(this.vx);
 
+    // батут: падаем на бельё или тент — подбрасывает
+    if (this.grounded || b.velocity.y >= 0) this.bounced = false;
+    if (!this.grounded && b.velocity.y > 0) {
+      const prevBottom = b.prev.y + b.height;
+      const bouncer = this.level.bouncers.find((o) => o.caught(b.center.x, prevBottom, b.bottom));
+      if (bouncer) {
+        b.setVelocityY(-bouncer.power);
+        b.y = bouncer.top - b.height;
+        this.bounced = true;
+        this.jumpBuffer = 0;
+        this.fromWall = false;
+        bouncer.bounce();
+        h.setState('air');
+        h.kick(0.22);
+        this.dust.ground(b.center.x, bouncer.top, 0.5);
+      }
+    }
+
     // прыжок: буфер нажатия + «койот» после схода с края
     this.coyote = this.grounded ? COYOTE : Math.max(0, this.coyote - dt);
     if (this.jumpBuffer > 0 && this.coyote > 0) {
@@ -144,7 +164,7 @@ export class HeroController {
       feedback.jump();
     }
     this.jumpT += dt;
-    const cut = b.velocity.y < 0 && !this.input.jumpHeld && this.jumpT > MIN_JUMP_TIME;
+    const cut = b.velocity.y < 0 && !this.input.jumpHeld && this.jumpT > MIN_JUMP_TIME && !this.bounced;
     b.setGravityY(cut ? CUT_GRAVITY : 0);
 
     // прилипание: в воздухе — к любой climbable-стене рядом; на земле — если идёт в неё

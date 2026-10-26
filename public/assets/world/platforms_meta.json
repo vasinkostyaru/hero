@@ -1,0 +1,67 @@
+{
+ "scale": 0.42,
+ "long": {
+  "wood": {
+   "h": 47,
+   "stand": 8,
+   "left": 94,
+   "right": 91,
+   "mids": [
+    51,
+    42,
+    43,
+    35,
+    50,
+    44,
+    44,
+    40,
+    46,
+    47
+   ]
+  },
+  "scaffold": {
+   "h": 70,
+   "stand": 14,
+   "left": 165,
+   "right": 166,
+   "mids": [
+    150,
+    150
+   ]
+  },
+  "beam": {
+   "h": 53,
+   "stand": 5,
+   "left": 80,
+   "right": 84,
+   "mids": [
+    105,
+    122,
+    117,
+    109
+   ]
+  }
+ },
+ "special": {
+  "cradle": {
+   "w": 276,
+   "h": 196,
+   "stand": 167
+  },
+  "balcony": {
+   "w": 208,
+   "h": 215,
+   "stand": 76
+  },
+  "clothesline": {
+   "w": 321,
+   "h": 160,
+   "stand": 29
+  },
+  "trolley": {
+   "w": 93,
+   "h": 156,
+   "stand": null
+  }
+ }
+}

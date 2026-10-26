@@ -17,9 +17,10 @@ export interface PropDef {
 // водонапорный бак в 3–4 роста, труба ~1.5, антенна ~2 (ящик — часть уровня, на него можно встать)
 const PROPS: PropDef[] = [
   { key: 'water_tower', x: 230, heroes: 3.4 },
-  { key: 'chimney', x: 1300, heroes: 1.5 },
-  { key: 'antenna', x: 2420, heroes: 2 },
-  { key: 'ac_unit', x: 3050, heroes: 0.6 },
+  // антенна тонкая — за мостиком из досок читается; труба — в просвете между балкой и лесами
+  { key: 'antenna', x: 1300, heroes: 2 },
+  { key: 'chimney', x: 2420, heroes: 1.5 },
+  { key: 'ac_unit', x: 1520, heroes: 0.6 },
   { key: 'chimney', x: 3420, heroes: 1.5, far: true },
   { key: 'water_tower', x: 3800, heroes: 3.4, far: true },
   { key: 'antenna', x: 4650, heroes: 2, far: true },
