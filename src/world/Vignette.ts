@@ -1,0 +1,44 @@
+import Phaser from 'phaser';
+import { GAME_H, GAME_W } from '../config/game';
+
+const KEY = 'vignette';
+
+/** Тёмная виньетка по краям экрана — одна текстура на canvas, растягивается на ширину экрана. */
+export function addVignette(scene: Phaser.Scene) {
+  if (!scene.textures.exists(KEY)) {
+    const tex = scene.textures.createCanvas(KEY, GAME_W, GAME_H)!;
+    const ctx = tex.getContext();
+    const g = ctx.createRadialGradient(
+      GAME_W / 2, GAME_H * 0.5, GAME_H * 0.42,
+      GAME_W / 2, GAME_H * 0.5, GAME_W * 0.62,
+    );
+    g.addColorStop(0, 'rgba(30, 8, 30, 0)');
+    g.addColorStop(0.55, 'rgba(30, 8, 34, 0.22)');
+    g.addColorStop(1, 'rgba(18, 4, 26, 0.62)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, GAME_W, GAME_H);
+    tex.refresh();
+  }
+  return scene.add
+    .image(0, 0, KEY)
+    .setOrigin(0, 0)
+    .setScrollFactor(0)
+    .setDepth(1000)
+    .setScale(scene.scale.width / GAME_W, scene.scale.height / GAME_H);
+}
+
+const GRADE = 0xffeedd;
+
+/**
+ * Тёплый общий тон: тинт всех картинок сцены (умножение цвета — приглушает синий).
+ * Ничего не стоит: ни полноэкранного прохода, ни лишнего слоя поверх.
+ * Светящиеся (ADD) объекты и уже тонированные не трогаем.
+ */
+export function addColorGrade(scene: Phaser.Scene) {
+  for (const obj of scene.children.list) {
+    if (obj instanceof Phaser.GameObjects.Particles.ParticleEmitter) continue;
+    const o = obj as Phaser.GameObjects.Image;
+    if (typeof o.setTint !== 'function' || o.isTinted || o.blendMode === Phaser.BlendModes.ADD) continue;
+    o.setTint(GRADE);
+  }
+}
