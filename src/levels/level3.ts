@@ -11,7 +11,8 @@ import type { LevelDef } from './types';
 export const LEVEL3: LevelDef = {
   id: 3,
   items: ['pajamas', 'underpants', 'sock'],
-  slots: 'rope',
+  world: 1,
+  theme: 'sunset',
   sections: [
     {
       name: 'Старт',
@@ -22,8 +23,9 @@ export const LEVEL3: LevelDef = {
         { key: 'water_tower', x: 80, heroes: 3.4 },
         { key: 'chimney', x: 1250, heroes: 1.5 },
       ],
-      critters: [{ kind: 'drone', x: 900, y: G - 450 }],
-      crow: { x: 1290, y: G - 248 },
+      critters: [
+        { kind: 'pigeon', x: 700, floorY: G, minX: 550, maxX: 950 },{ kind: 'drone', x: 900, y: G - 450 }],
+      perch: { x: 1290, y: G - 248 },
     },
     {
       // стройка: пролетая над краном, Ворон вешает пижаму на крюк
@@ -41,7 +43,7 @@ export const LEVEL3: LevelDef = {
         { kind: 'drone2', x: 1650, y: G - 600 },
       ],
       items: [{ key: 'pajamas', x: 0, y: 0, carried: true, attach: 'crane3' }],
-      crow: { x: 470, y: G - 215 },
+      perch: { x: 470, y: G - 215 },
     },
     {
       name: 'Улица',
@@ -53,7 +55,7 @@ export const LEVEL3: LevelDef = {
       ],
       hooks: [{ x: 940, y: G - 650, spanL: 430, spanR: 1450 }],
       critters: [{ kind: 'seagull', x: 1500, y: G - 760, range: 300 }],
-      crow: { x: 1560, y: G },
+      perch: { x: 1560, y: G },
     },
     {
       // люлька и колодец — подъём к арене; Ворон ждёт на стене и улетает на арену
@@ -67,45 +69,59 @@ export const LEVEL3: LevelDef = {
         { x: 1450, y: G - 280, w: 300, h: 64, kind: 'platform', look: 'wood' },
       ],
       critters: [
+        { kind: 'drone', x: 640, y: G - 380 },
         { kind: 'drone2', x: 1500, y: G - 500 },
         { kind: 'pigeon', x: 1800, floorY: G, minX: 1300, maxX: 2150 },
       ],
-      crow: { x: 1105, y: G - 545 },
+      perch: { x: 1105, y: G - 545 },
     },
     {
-      // арена: бочка, труба, высокий мостик — три насеста; Ворон зовёт три волны шалунов
+      // арена: бочка, труба, высокий мостик — три насеста; Ворон зовёт три волны шалунов.
+      // Мостики лесенкой в три яруса (прыжок ≈300 px, шаг ≤190) — к любому насесту можно подобраться.
       name: 'Арена',
       w: 2600,
       flag: 100,
       solids: [
+        // слева — к бочке
+        { x: 220, y: G - 190, w: 240, h: 64, kind: 'platform', look: 'wood' },
+        { x: 520, y: G - 370, w: 220, h: 64, kind: 'platform', look: 'scaffold' },
+        { x: 260, y: G - 550, w: 220, h: 64, kind: 'platform', look: 'wood' },
+        // середина — горка над трубой
+        { x: 1100, y: G - 200, w: 260, h: 64, kind: 'platform', look: 'scaffold' },
+        { x: 1220, y: G - 390, w: 240, h: 64, kind: 'platform', look: 'wood' },
+        { x: 1040, y: G - 570, w: 220, h: 64, kind: 'platform', look: 'scaffold' },
+        // справа — к высокому мостику
+        { x: 1700, y: G - 230, w: 220, h: 64, kind: 'platform', look: 'wood' },
         { x: 1950, y: G - 420, w: 300, h: 64, kind: 'platform', look: 'wood' },
-        { x: 1150, y: G - 200, w: 260, h: 64, kind: 'platform', look: 'scaffold' },
+        { x: 2260, y: G - 610, w: 260, h: 64, kind: 'platform', look: 'scaffold' },
       ],
       props: [
         { key: 'water_tower', x: 700, heroes: 3.4 },
-        { key: 'chimney', x: 1500, heroes: 1.5 },
+        { key: 'chimney', x: 1540, heroes: 1.5 },
         { key: 'antenna', x: 2450, heroes: 2, far: true },
       ],
-      lamps: [{ x: 2350 }],
       arena: {
         perches: [
           { x: 700, y: G - 690 },
-          { x: 1540, y: G - 248 },
-          { x: 2100, y: G - 420 },
+          { x: 1580, y: G - 248 },
+          { x: 2390, y: G - 610 },
         ],
         waves: [
           [
+            { kind: 'drone2', x: 1500, y: G - 600 },
             { kind: 'drone', x: 900, y: G - 480 },
             { kind: 'drone', x: 1750, y: G - 420 },
             { kind: 'pigeon', x: 1300, floorY: G, minX: 1000, maxX: 1600 },
           ],
           [
+            { kind: 'drone', x: 400, y: G - 700 },
             { kind: 'seagull', x: 1000, y: G - 760, range: 400 },
             { kind: 'seagull', x: 1800, y: G - 720, range: 300 },
             { kind: 'pigeon', x: 800, floorY: G, minX: 450, maxX: 1100 },
             { kind: 'pigeon', x: 1900, floorY: G, minX: 1650, maxX: 2300 },
           ],
           [
+            { kind: 'pigeon', x: 500, floorY: G, minX: 300, maxX: 800 },
             { kind: 'drone2', x: 1200, y: G - 520 },
             { kind: 'drone2', x: 1900, y: G - 480 },
             { kind: 'seagull', x: 1450, y: G - 760, range: 350 },

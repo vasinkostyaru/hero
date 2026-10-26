@@ -27,10 +27,22 @@ export function addVignette(scene: Phaser.Scene) {
     .setScale(scene.scale.width / GAME_W, scene.scale.height / GAME_H);
 }
 
-const GRADE = 0xffeedd;
+/** Общий тон сцены (тема уровня, world/Theme.ts): закат — тёплый, ночь — синий. */
+let grade = 0xffeedd;
+
+/** Тон темы — до постройки уровня: от него зависят уже тонированные картинки (graded). */
+export function setGrade(color: number) {
+  grade = color;
+}
+
+/** Цвет, умноженный на общий тон: для картинок, у которых уже свой тинт (кирпич, дальний декор). */
+export function graded(color: number) {
+  const ch = (shift: number) => Math.round((((color >> shift) & 255) * ((grade >> shift) & 255)) / 255);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
 
 /**
- * Тёплый общий тон: тинт всех картинок сцены (умножение цвета — приглушает синий).
+ * Общий тон: тинт всех картинок сцены (умножение цвета — на закате приглушает синий).
  * Ничего не стоит: ни полноэкранного прохода, ни лишнего слоя поверх.
  * Светящиеся (ADD) объекты и уже тонированные не трогаем.
  */
@@ -39,6 +51,6 @@ export function addColorGrade(scene: Phaser.Scene) {
     if (obj instanceof Phaser.GameObjects.Particles.ParticleEmitter) continue;
     const o = obj as Phaser.GameObjects.Image;
     if (typeof o.setTint !== 'function' || o.isTinted || o.blendMode === Phaser.BlendModes.ADD) continue;
-    o.setTint(GRADE);
+    o.setTint(grade);
   }
 }

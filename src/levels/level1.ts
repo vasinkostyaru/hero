@@ -12,7 +12,8 @@ import type { LevelDef } from './types';
 export const LEVEL1: LevelDef = {
   id: 1,
   items: ['scarf', 'cap', 'tshirt'],
-  slots: 'rope',
+  world: 1,
+  theme: 'sunset',
   sections: [
     {
       // завязка: Ворон сидит на трубе с носком, крупный план, хохочет и улетает
@@ -26,8 +27,9 @@ export const LEVEL1: LevelDef = {
         { key: 'chimney', x: 1150, heroes: 1.5 },
         { key: 'antenna', x: 1450, heroes: 2, far: true },
       ],
-      critters: [{ kind: 'drone', x: 820, y: G - 430 }],
-      crow: { x: 1190, y: G - 248 },
+      critters: [
+        { kind: 'pigeon', x: 900, floorY: G, minX: 820, maxX: 1080 },{ kind: 'drone', x: 820, y: G - 430 }],
+      perch: { x: 1190, y: G - 248 },
     },
     {
       // учимся паутине на дронах; ящик и мостики-ступеньки
@@ -48,7 +50,7 @@ export const LEVEL1: LevelDef = {
         { kind: 'drone', x: 1480, y: G - 380 },
         { kind: 'pigeon', x: 700, floorY: G - 190, minX: 590, maxX: 830 },
       ],
-      crow: { x: 1790, y: G - 248 },
+      perch: { x: 1790, y: G - 248 },
     },
     {
       // кепка в гнезде на ящиках — на ней сидит голубь; закоконь — и кепка твоя
@@ -71,7 +73,7 @@ export const LEVEL1: LevelDef = {
       ],
       items: [{ key: 'cap', x: 1170, y: G - 132, guard: 'nestGuard', carried: true }],
       // сидит перед гнездом; взлетая, роняет в него кепку
-      crow: { x: 820, y: G },
+      perch: { x: 820, y: G },
     },
     {
       // стройка: Ворон пролетает над балкой и роняет шарф — тот цепляется за крюк крана
@@ -93,7 +95,7 @@ export const LEVEL1: LevelDef = {
       ],
       items: [{ key: 'scarf', x: 0, y: 0, carried: true, attach: 'crane' }],
       // сидит на лесах перед балкой; пролетая над крюком крана, роняет на него шарф
-      crow: { x: 470, y: G - 215 },
+      perch: { x: 470, y: G - 215 },
     },
     {
       // низкая стена с балконом — основной путь; башня на лесах с футболкой — по желанию
@@ -110,12 +112,13 @@ export const LEVEL1: LevelDef = {
       ],
       props: [{ key: 'antenna', x: 1180, heroes: 1.1, y: G - 646 }],
       critters: [
+        { kind: 'drone', x: 300, y: G - 460 },
         { kind: 'seagull', x: 900, y: G - 760, range: 350 },
         { kind: 'pigeon', x: 1200, floorY: G, minX: 700, maxX: 1700 },
       ],
       items: [{ key: 'tshirt', x: 1200, y: G - 755, carried: true }],
       // сидит на низкой стене; пролетая над башней, роняет футболку на антенну
-      crow: { x: 575, y: G - 300 },
+      perch: { x: 575, y: G - 300 },
     },
     {
       // широкая улица: не перепрыгнуть — качели на паутине за фонарь на тросе
@@ -129,7 +132,7 @@ export const LEVEL1: LevelDef = {
       // крюк высоко: нить длинная, размах большой
       hooks: [{ x: 940, y: G - 650, spanL: 430, spanR: 1450 }],
       critters: [{ kind: 'drone', x: 1650, y: G - 380 }],
-      crow: { x: 1560, y: G },
+      perch: { x: 1560, y: G },
     },
     {
       // люлька поднимает к колодцу; дрон-2 таранит
@@ -147,10 +150,11 @@ export const LEVEL1: LevelDef = {
         { key: 'chimney', x: 1950, heroes: 1.5 },
       ],
       critters: [
+        { kind: 'drone', x: 640, y: G - 380 },
         { kind: 'drone2', x: 1500, y: G - 470 },
         { kind: 'pigeon', x: 1800, floorY: G, minX: 1300, maxX: 2150 },
       ],
-      crow: { x: 1105, y: G - 545 },
+      perch: { x: 1105, y: G - 545 },
     },
     {
       // финал: Ворон на водонапорной бочке хохочет и улетает с носком → победа
@@ -169,7 +173,7 @@ export const LEVEL1: LevelDef = {
         { kind: 'drone2', x: 1300, y: G - 520 },
         { kind: 'seagull', x: 1900, y: G - 760, range: 400 },
       ],
-      crow: { x: 1700, y: G - 690 },
+      perch: { x: 1700, y: G - 690 },
     },
   ],
 };

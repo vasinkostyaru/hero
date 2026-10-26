@@ -1,0 +1,156 @@
+{
+ "frames": {
+  "fly_2": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 222,
+    "h": 168
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 222,
+    "h": 168
+   },
+   "sourceSize": {
+    "w": 222,
+    "h": 168
+   },
+   "pivot": {
+    "x": 0.4049,
+    "y": 0.9881
+   }
+  },
+  "fly_1": {
+   "frame": {
+    "x": 224,
+    "y": 0,
+    "w": 205,
+    "h": 182
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 205,
+    "h": 182
+   },
+   "sourceSize": {
+    "w": 205,
+    "h": 182
+   },
+   "pivot": {
+    "x": 0.3644,
+    "y": 0.9671
+   }
+  },
+  "fly_3": {
+   "frame": {
+    "x": 431,
+    "y": 0,
+    "w": 197,
+    "h": 193
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 197,
+    "h": 193
+   },
+   "sourceSize": {
+    "w": 197,
+    "h": 193
+   },
+   "pivot": {
+    "x": 0.3436,
+    "y": 0.8756
+   }
+  },
+  "fly_4": {
+   "frame": {
+    "x": 630,
+    "y": 0,
+    "w": 217,
+    "h": 174
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 217,
+    "h": 174
+   },
+   "sourceSize": {
+    "w": 217,
+    "h": 174
+   },
+   "pivot": {
+    "x": 0.3926,
+    "y": 0.9654
+   }
+  },
+  "laugh": {
+   "frame": {
+    "x": 849,
+    "y": 0,
+    "w": 168,
+    "h": 175
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 168,
+    "h": 175
+   },
+   "sourceSize": {
+    "w": 168,
+    "h": 175
+   },
+   "pivot": {
+    "x": 0.4317,
+    "y": 0.9886
+   }
+  },
+  "dizzy": {
+   "frame": {
+    "x": 1019,
+    "y": 0,
+    "w": 210,
+    "h": 158
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 210,
+    "h": 158
+   },
+   "sourceSize": {
+    "w": 210,
+    "h": 158
+   },
+   "pivot": {
+    "x": 0.4998,
+    "y": 0.9905
+   }
+  }
+ },
+ "meta": {
+  "image": "bumblebee_atlas.png",
+  "size": {
+   "w": 1231,
+   "h": 193
+  },
+  "scale": "1"
+ }
+}

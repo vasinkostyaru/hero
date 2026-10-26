@@ -1,0 +1,156 @@
+{
+ "frames": {
+  "fly_2": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 258,
+    "h": 260
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 258,
+    "h": 260
+   },
+   "sourceSize": {
+    "w": 258,
+    "h": 260
+   },
+   "pivot": {
+    "x": 0.2741,
+    "y": 0.9933
+   }
+  },
+  "fly_1": {
+   "frame": {
+    "x": 260,
+    "y": 0,
+    "w": 249,
+    "h": 275
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 249,
+    "h": 275
+   },
+   "sourceSize": {
+    "w": 249,
+    "h": 275
+   },
+   "pivot": {
+    "x": 0.2109,
+    "y": 0.9283
+   }
+  },
+  "fly_3": {
+   "frame": {
+    "x": 511,
+    "y": 0,
+    "w": 275,
+    "h": 235
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 275,
+    "h": 235
+   },
+   "sourceSize": {
+    "w": 275,
+    "h": 235
+   },
+   "pivot": {
+    "x": 0.3327,
+    "y": 1.042
+   }
+  },
+  "jump": {
+   "frame": {
+    "x": 788,
+    "y": 0,
+    "w": 212,
+    "h": 273
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 212,
+    "h": 273
+   },
+   "sourceSize": {
+    "w": 212,
+    "h": 273
+   },
+   "pivot": {
+    "x": 0.1574,
+    "y": 0.9936
+   }
+  },
+  "laugh": {
+   "frame": {
+    "x": 1002,
+    "y": 0,
+    "w": 221,
+    "h": 201
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 221,
+    "h": 201
+   },
+   "sourceSize": {
+    "w": 221,
+    "h": 201
+   },
+   "pivot": {
+    "x": 0.5065,
+    "y": 0.9913
+   }
+  },
+  "dizzy": {
+   "frame": {
+    "x": 1225,
+    "y": 0,
+    "w": 276,
+    "h": 227
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 276,
+    "h": 227
+   },
+   "sourceSize": {
+    "w": 276,
+    "h": 227
+   },
+   "pivot": {
+    "x": 0.2954,
+    "y": 0.9923
+   }
+  }
+ },
+ "meta": {
+  "image": "raccoon_atlas.png",
+  "size": {
+   "w": 1503,
+   "h": 275
+  },
+  "scale": "1"
+ }
+}

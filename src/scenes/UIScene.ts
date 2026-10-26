@@ -3,6 +3,7 @@ import { feedback } from '../audio/feedback';
 import { BUTTONS, layoutButtons, type ButtonId, type TouchControls } from '../input/TouchControls';
 import { ItemSlots, type SlotStyle } from '../ui/ItemSlots';
 import { itemScale } from '../world/Item';
+import type { VillainKind } from '../world/Villain';
 import { addVignette } from '../world/Vignette';
 import type { LevelScene } from './LevelScene';
 
@@ -31,15 +32,20 @@ export class UIScene extends Phaser.Scene {
   private victory: ItemSlots | null = null;
   private overlay: Phaser.GameObjects.Container | null = null;
   private corner!: Phaser.GameObjects.Container;
-  /** перья босса: сколько попаданий осталось */
+  /** перья (гайки, хвосты) босса: сколько попаданий осталось */
   private bossBar: Phaser.GameObjects.Image[] = [];
+  private villain: VillainKind = 'crow';
+  /** особая вещь мира — злодей уносит её с собой */
+  private special = 'sock';
 
   constructor() {
     super('UI');
   }
 
-  init(data: { touch: TouchControls; iris?: boolean; items: string[]; slots: SlotStyle }) {
+  init(data: { touch: TouchControls; iris?: boolean; items: string[]; slots: SlotStyle; villain: VillainKind; special: string }) {
     this.touch = data.touch;
+    this.villain = data.villain;
+    this.special = data.special;
     this.openOnStart = !!data.iris;
     this.itemKeys = data.items;
     this.slotStyle = data.slots;
@@ -172,7 +178,7 @@ export class UIScene extends Phaser.Scene {
 
   /**
    * Победа: верёвка с тремя предметами (найденные — в цвете, остальные — силуэтом),
-   * звёзды падают по одной, Август машет вслед Ворону; кнопки «дальше» и «ещё раз».
+   * звёзды падают по одной, Август машет вслед злодею; кнопки «дальше» и «ещё раз».
    */
   showVictory(found: boolean[], boss = false) {
     const W = this.scale.width;
@@ -208,22 +214,26 @@ export class UIScene extends Phaser.Scene {
       return star;
     });
 
-    // Август машет вслед Ворону: попеременно стоит и тянет руку
+    // Август машет вслед злодею: попеременно стоит и тянет руку
     const hero = this.add.sprite(W * 0.18, H - 120, 'hero', 'idle').setOrigin(0.5, 300 / 320).setScale(1.4);
     this.time.addEvent({ delay: 380, loop: true, callback: () => hero.setFrame(hero.frame.name === 'idle' ? 'shoot' : 'idle') });
-    let crow: Phaser.GameObjects.GameObject;
+    let villain: Phaser.GameObjects.GameObject;
+    const v = this.villain;
     if (boss) {
-      // побеждённый Ворон сидит без сил рядом, над ним кружат звёздочки; салют
-      crow = this.add.image(W * 0.8, H - 90, 'crow_dizzy').setScale(0.55).setOrigin(0.5, 1);
+      // побеждённый злодей сидит без сил рядом; салют
+      villain = this.add.sprite(W * 0.8, H - 90, v, 'dizzy').setScale(1.25);
       this.time.addEvent({ delay: 420, repeat: 10, callback: () => this.burst(W * (0.15 + Math.random() * 0.7), H * (0.1 + Math.random() * 0.3), 26) });
     } else {
-      // Ворон с носком в клюве улетает в правый верхний угол, машет крыльями
-      const crowImg = this.add.image(0, 0, 'crow_fly_1').setScale(0.3);
-      const sock = this.add.image(46, 12, 'sock').setScale(0.24).setOrigin(0.5, 0.15);
-      const fly = this.add.container(W * 0.72, H * 0.2, [crowImg, sock]);
-      this.time.addEvent({ delay: 125, loop: true, callback: () => crowImg.setTexture(crowImg.texture.key === 'crow_fly_1' ? 'crow_fly_2' : 'crow_fly_1') });
-      this.tweens.add({ targets: fly, x: W + 200, y: -150, duration: 3200, ease: 'Sine.In' });
-      crow = fly;
+      // злодей с особой вещью улетает в правый верхний угол (кадры полёта атласа)
+      const hold = (this.cache.json.get(`${v}_meta`) as { hold: { x: number; y: number } }).hold;
+      const fly = this.add.sprite(0, 0, v, 'fly_1');
+      const item = this.add.image(hold.x, hold.y, this.special).setScale(itemScale(this, this.special, 70)).setOrigin(0.5, 0.15);
+      const frames = this.textures.get(v).getFrameNames().filter((f) => f.startsWith('fly_')).sort();
+      const box = this.add.container(W * 0.72, H * 0.3, [fly, item]).setScale(0.75);
+      let i = 0;
+      this.time.addEvent({ delay: 110, loop: true, callback: () => fly.setFrame(frames[++i % frames.length]) });
+      this.tweens.add({ targets: box, x: W + 250, y: -100, duration: 3200, ease: 'Sine.In' });
+      villain = box;
     }
 
     const buttons = [
@@ -234,16 +244,16 @@ export class UIScene extends Phaser.Scene {
       b.setAlpha(0);
       this.tweens.add({ targets: b, alpha: 1, duration: 300, delay: 1900 });
     }
-    this.overlay = this.add.container(0, 0, [dim, slots.root, ...stars, hero, crow, ...buttons]).setDepth(1000);
+    this.overlay = this.add.container(0, 0, [dim, slots.root, ...stars, hero, villain, ...buttons]).setDepth(1000);
   }
 
-  /** Битва с боссом: под верёвкой — ряд перьев, по одному за каждое оставшееся попадание. */
+  /** Битва с боссом: под слотами — ряд перьев (гаек, полосок хвоста), по одному за каждое оставшееся попадание. */
   showBossBar(n: number) {
-    makeFeather(this);
+    const icon = makeBossIcon(this, this.villain);
     const W = this.scale.width;
     const gap = 46;
     this.bossBar = Array.from({ length: n }, (_, i) =>
-      this.add.image(W / 2 + (i - (n - 1) / 2) * gap, 150, 'boss_feather').setScale(0).setAngle(-20),
+      this.add.image(W / 2 + (i - (n - 1) / 2) * gap, 150, icon).setScale(0).setAngle(-20),
     );
     this.bossBar.forEach((f, i) => this.tweens.add({ targets: f, scale: 1, delay: i * 60, duration: 300, ease: 'Back.Out' }));
   }
@@ -375,14 +385,32 @@ export class UIScene extends Phaser.Scene {
   }
 }
 
-/** Перо Ворона (полоса босса) — один раз в текстуру: тёмно-фиолетовое, с тёплым бликом. */
-function makeFeather(scene: Phaser.Scene) {
-  if (scene.textures.exists('boss_feather')) return;
+/**
+ * Значок полосы босса — один раз в текстуру: перо Ворона, гайка Робо-Шмеля,
+ * полосатый хвост Енота. Возвращает ключ.
+ */
+function makeBossIcon(scene: Phaser.Scene, v: VillainKind) {
+  const key = `boss_${v}`;
+  if (scene.textures.exists(key)) return key;
   const g = scene.make.graphics({}, false);
-  g.fillStyle(0x140820, 1).fillEllipse(20, 30, 26, 54);
-  g.fillStyle(0x3a2456, 1).fillEllipse(20, 28, 18, 46);
-  g.fillStyle(0xffb46a, 0.6).fillEllipse(16, 20, 5, 22);
-  g.lineStyle(3, 0x140820, 1).lineBetween(20, 50, 20, 62);
-  g.generateTexture('boss_feather', 40, 64);
+  if (v === 'crow') {
+    g.fillStyle(0x140820, 1).fillEllipse(20, 30, 26, 54);
+    g.fillStyle(0x3a2456, 1).fillEllipse(20, 28, 18, 46);
+    g.fillStyle(0xffb46a, 0.6).fillEllipse(16, 20, 5, 22);
+    g.lineStyle(3, 0x140820, 1).lineBetween(20, 50, 20, 62);
+  } else if (v === 'bumblebee') {
+    // шестигранная гайка в жёлто-чёрных цветах шмеля
+    const hex = (r: number) => Array.from({ length: 6 }, (_, i) => new Phaser.Math.Vector2(20 + r * Math.cos((i * Math.PI) / 3), 32 + r * Math.sin((i * Math.PI) / 3)));
+    g.fillStyle(0x1c1410, 1).fillPoints(hex(19), true);
+    g.fillStyle(0xffc23a, 1).fillPoints(hex(15), true);
+    g.fillStyle(0x1c1410, 1).fillCircle(20, 32, 6);
+    g.fillStyle(0xfff0b0, 0.7).fillEllipse(14, 24, 6, 3);
+  } else {
+    // кончик хвоста енота: серые и тёмные полоски
+    g.fillStyle(0x1c1418, 1).fillEllipse(20, 32, 30, 58);
+    [0x8a8090, 0x2a2028, 0x8a8090, 0x2a2028, 0xb8b0bc].forEach((c, i) => g.fillStyle(c, 1).fillEllipse(20, 50 - i * 9, 22 - i * 1.5, 12));
+  }
+  g.generateTexture(key, 40, 64);
   g.destroy();
+  return key;
 }

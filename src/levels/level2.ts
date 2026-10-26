@@ -10,7 +10,8 @@ import type { LevelDef } from './types';
 export const LEVEL2: LevelDef = {
   id: 2,
   items: ['mitten', 'towel', 'shorts'],
-  slots: 'rope',
+  world: 1,
+  theme: 'sunset',
   sections: [
     {
       name: 'Крыша с бельём',
@@ -22,8 +23,9 @@ export const LEVEL2: LevelDef = {
         { key: 'water_tower', x: 1000, heroes: 3.4, far: true },
         { key: 'chimney', x: 1250, heroes: 1.5 },
       ],
-      critters: [{ kind: 'drone', x: 950, y: G - 450 }],
-      crow: { x: 1290, y: G - 248 },
+      critters: [
+        { kind: 'pigeon', x: 950, floorY: G, minX: 850, maxX: 1150 },{ kind: 'drone', x: 950, y: G - 450 }],
+      perch: { x: 1290, y: G - 248 },
     },
     {
       // мостики лесенкой; варежку Ворон роняет на крышу за ними
@@ -43,7 +45,7 @@ export const LEVEL2: LevelDef = {
         { kind: 'drone', x: 1450, y: G - 430 },
       ],
       items: [{ key: 'mitten', x: 1800, y: G - 70, carried: true }],
-      crow: { x: 1300, y: G - 200 },
+      perch: { x: 1300, y: G - 200 },
     },
     {
       name: 'Первая улица',
@@ -55,10 +57,11 @@ export const LEVEL2: LevelDef = {
       ],
       hooks: [{ x: 940, y: G - 650, spanL: 430, spanR: 1450 }],
       critters: [{ kind: 'drone', x: 1650, y: G - 380 }],
-      crow: { x: 1560, y: G },
+      perch: { x: 1560, y: G },
     },
     {
-      // две люльки; со второй — на высокий мостик за полотенцем
+      // две люльки; со второй — на высокий мостик за полотенцем. Кому люльки трудно —
+      // справа лесенка из мостиков к тому же мостику
       name: 'Люльки',
       w: 2200,
       flag: 100,
@@ -66,14 +69,19 @@ export const LEVEL2: LevelDef = {
         { x: 300, top: G - 560, bottom: G - 40, period: 6 },
         { x: 820, top: G - 640, bottom: G - 220, period: 7.5 },
       ],
-      solids: [{ x: 1380, y: G - 620, w: 300, h: 64, kind: 'platform', look: 'wood' }],
-      props: [
-        { key: 'water_tower', x: 1900, heroes: 3.4, far: true },
-        { key: 'chimney', x: 1850, heroes: 1.5 },
+      solids: [
+        { x: 1380, y: G - 620, w: 300, h: 64, kind: 'platform', look: 'wood' },
+        { x: 1720, y: G - 420, w: 220, h: 64, kind: 'platform', look: 'wood' },
+        { x: 1900, y: G - 220, w: 250, h: 64, kind: 'platform', look: 'wood' },
       ],
-      critters: [{ kind: 'seagull', x: 1100, y: G - 780, range: 400 }],
+      props: [
+        { key: 'water_tower', x: 1250, heroes: 3.4, far: true },
+        { key: 'chimney', x: 2120, heroes: 1.5, far: true },
+      ],
+      critters: [
+        { kind: 'drone', x: 600, y: G - 420 },{ kind: 'seagull', x: 1100, y: G - 780, range: 400 }],
       items: [{ key: 'towel', x: 1530, y: G - 700, carried: true }],
-      crow: { x: 1200, y: G },
+      perch: { x: 1200, y: G },
     },
     {
       name: 'Вторая улица',
@@ -85,7 +93,7 @@ export const LEVEL2: LevelDef = {
       ],
       hooks: [{ x: 900, y: G - 650, spanL: 380, spanR: 1420 }],
       critters: [{ kind: 'pigeon', x: 1600, floorY: G, minX: 1350, maxX: 1850 }],
-      crow: { x: 1700, y: G },
+      perch: { x: 1700, y: G },
     },
     {
       // колодец; за ним гнездо на ящиках — шорты под голубем
@@ -105,7 +113,7 @@ export const LEVEL2: LevelDef = {
         { kind: 'pigeon', id: 'nestGuard2', x: 1820, floorY: G - 110, minX: 1820, maxX: 1820 },
       ],
       items: [{ key: 'shorts', x: 1820, y: G - 132, guard: 'nestGuard2', carried: true }],
-      crow: { x: 905, y: G - 545 },
+      perch: { x: 905, y: G - 545 },
     },
     {
       // финал: Ворон на бочке, мёртвая петля над Августом — улетает
@@ -120,10 +128,11 @@ export const LEVEL2: LevelDef = {
       ],
       lamps: [{ x: 2100 }],
       critters: [
+        { kind: 'seagull', x: 1950, y: G - 760, range: 300 },
         { kind: 'pigeon', x: 600, floorY: G, minX: 400, maxX: 1000 },
         { kind: 'drone2', x: 1300, y: G - 520 },
       ],
-      crow: { x: 1700, y: G - 690 },
+      perch: { x: 1700, y: G - 690 },
     },
   ],
 };

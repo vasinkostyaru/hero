@@ -82,6 +82,8 @@ export class HeroController {
   private lastBottom = 0;
   /** только что отпустил нить — сразу не цепляемся снова */
   private swingCd = 0;
+  /** летит между крюками (отпустил нить и ещё не встал): паутина только цепляется, не стреляет */
+  private swingFlight = false;
 
   /** Приземление: скорость падения, px/с (для тряски камеры с высоты). */
   onLand: (fallSpeed: number) => void = () => {};
@@ -124,6 +126,7 @@ export class HeroController {
 
     // картинка героя — по телу, один раз за кадр
     h.setPosition(b.center.x, b.bottom);
+    if (this.grounded || this.wallDir !== 0) this.swingFlight = false;
     this.swingCd = Math.max(0, this.swingCd - dt);
     // в воздухе у крюка — качели; иначе обычный выстрел (ребёнку не нужно выбирать).
     // Нажал чуть раньше и держишь — нить цепляется сама, как только крюк в досягаемости.
@@ -132,7 +135,7 @@ export class HeroController {
         ? this.level.hookInReach(b.center.x, b.center.y)
         : null;
     if (hook) this.attach(hook);
-    else if (shoot && !this.locked && !this.swing) {
+    else if (shoot && !this.locked && !this.swing && !this.swingFlight) {
       if (this.cooldown === 0) {
         this.cooldown = SHOOT_COOLDOWN;
         feedback.shoot();
@@ -149,6 +152,7 @@ export class HeroController {
     const b = this.body;
     const len = Phaser.Math.Clamp(Math.hypot(b.center.x - hook.x, b.center.y - hook.y), 180, SWING_REACH);
     this.swing = { hook, len };
+    this.swingFlight = true;
     this.bounced = false;
     b.setGravityY(0);
     feedback.shoot();

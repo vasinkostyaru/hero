@@ -4,41 +4,63 @@ import type { CritterEnv, WebTarget } from './Critter';
 import type { Perch } from './Level';
 import { scaledTexture } from './textures';
 
-/** Ворон ~ростом с героя: crow2/crow_laugh.png (461 px) × 0.46 ≈ 212 px. */
-const LAUGH_SCALE = 0.46;
-/** Полёт (crow_fly_1/2) и лёжа — на этих картинках он нарисован крупнее. */
-const FLY_SCALE = 0.45;
-const DIZZY_SCALE = 0.42;
-/** Взмахи: 2 кадра, ~8 к/с (CROW2.md). */
-const FLAP_FPS = 8;
-/** Клюв в полёте — от точки у лап (вещь висит под ним); картинки выровнены по клюву (beak.json). */
-const BEAK = { x: 70, y: -125 };
-/** Вещь в клюве — по большей стороне (как на art/crow_items_preview.png, ~треть Ворона). */
+/** Вещь в лапах/клюве — по большей стороне (как на art/crow_items_preview.png, ~треть злодея). */
 const CARRY_SIZE = 70;
-/** Босс (уровень 3): столько попаданий, чтобы он выронил последние вещи. */
+/** Босс (уровень 3 мира): столько попаданий, чтобы он выронил последние вещи. */
 export const BOSS_HITS = 10;
-/** После стольких попаданий зовёт голубей на помощь (фаза 2), потом пикирует (фаза 3). */
+/** После стольких попаданий зовёт новую волну банды. */
 const SUMMON_AT = [0, 3, 6];
 /** После попадания столько неуязвим: очередью паутины босса не взять. */
 const HURT_CD = 1.1;
-/** Фаза пике — после последней волны. */
-const DIVE_FROM = 6;
-/** Фаза 3: пауза на насесте между пике, с. */
-const DIVE_PAUSE: [number, number] = [1.4, 2.2];
+/** Без щита пикирует на героя: пауза на насесте между пике, с; к концу битвы — всё чаще. */
+const DIVE_PAUSE: [number, number] = [1.6, 2.4];
+/** Банда в коконах, щит лопнул — почти сразу бросается на героя. */
+const AFTER_SHIELD = 0.7;
+/** Перед пике столько трясётся и краснеет — видно, что сейчас бросится. */
+const DIVE_WARN = 0.45;
 const DIVE_T = 1.3;
-/** Герой подошёл ближе — Ворон перелетает на другое место. */
+/** Герой подошёл ближе — злодей перелетает на другое место. */
 const FLEE_X = 320;
 const FLEE_Y = 300;
 const FLY_SPEED = 650;
 /** Дразнится, только когда герой хотя бы примерно рядом. */
 const TEASE_DIST = 1300;
 const GRAVITY = 1900;
-/** Голова на crow_dizzy относительно лап (origin снизу по центру) — над ней кружат звёздочки. */
-const DIZZY_HEAD = { x: 66, y: -100 };
 
-type CrowState = 'perch' | 'fly' | 'dive' | 'tease' | 'escape' | 'gone' | 'dizzy';
+export type VillainKind = 'crow' | 'bumblebee' | 'raccoon';
+
+/**
+ * Чем злодеи отличаются друг от друга. Кадры — в атласе chars/<kind> (art/chars2.py):
+ * опора каждого кадра — у лап (корень злодея), в <kind>_meta.json — где висит вещь (hold)
+ * и где голова у поверженного (head).
+ */
+interface VillainLook {
+  /** цикл полёта и его частота */
+  fly: string[];
+  flyFps: number;
+  /** пока набирает высоту — этот кадр (енот подпрыгивает с зонтом) */
+  rise?: string;
+  /** на насесте висит в воздухе, машет крыльями (шмель); хохочет — кадр laugh */
+  hover?: boolean;
+  /** цвет щита, пока банда не в коконах */
+  shield: number;
+  voice: (pitch?: number) => void;
+}
+
+const LOOKS: Record<VillainKind, VillainLook> = {
+  // Ворон-хулиган: 2 взмаха ~8 к/с (CROW2.md)
+  crow: { fly: ['fly_1', 'fly_2'], flyFps: 8, shield: 0x5ff5e6, voice: (p) => feedback.caw(p) },
+  // Робо-Шмель: жужжит, крылья мелькают быстро, на насесте висит в воздухе
+  bumblebee: { fly: ['fly_1', 'fly_2', 'fly_3', 'fly_4'], flyFps: 18, hover: true, shield: 0xffd84a, voice: (p) => feedback.buzz(p) },
+  // Енот-Бандит: подпрыгивает с зонтом и планирует, болтая лапами
+  raccoon: { fly: ['fly_1', 'fly_2', 'fly_3', 'fly_2'], flyFps: 6, rise: 'jump', shield: 0xff8a7a, voice: (p) => feedback.giggle(p) },
+};
+
+type VillainState = 'perch' | 'fly' | 'dive' | 'tease' | 'escape' | 'gone' | 'dizzy';
 /** Уровень: дразнится и ведёт вперёд, в конце улетает. Босс: битва на арене, 10 попаданий. */
-export interface CrowOptions {
+export interface VillainOptions {
+  /** вещь, которую несёт, когда вещей уровня не осталось (носок, дракон, торт) */
+  special: string;
   /** босс: попал — осталось столько попаданий */
   onBossHit?: (left: number) => void;
   /** босс зовёт волну шалунов (номер волны); пока они не в коконах — сам под щитом (unshield) */
@@ -47,7 +69,7 @@ export interface CrowOptions {
   onDefeat?: (x: number, y: number) => void;
   /** вещи уровня по порядку: несёт следующую, роняет над её местом (или улетая с насеста) */
   items?: CarriedItem[];
-  /** уронил вещь из клюва в точке (x, y) */
+  /** уронил вещь в точке (x, y) */
   onDrop?: (key: string, x: number, y: number) => void;
   /** улетел с последнего насеста за край — уровень пройден */
   onEscape?: () => void;
@@ -55,17 +77,17 @@ export interface CrowOptions {
 /** На уровне: подошёл на столько (или обогнал) — улетает на насест следующей зоны. */
 const LEAD_X = 380;
 
-/** Вещь, которую Ворон несёт: place — x её места на уровне; atPerch — роняет, улетая с этого насеста. */
+/** Вещь, которую злодей несёт: place — x её места на уровне; atPerch — роняет, улетая с этого насеста. */
 export interface CarriedItem {
   key: string;
   place: number;
-  /** высота места: Ворон роняет вещь, зависнув над ней (вещь падает только вниз) */
+  /** высота места: злодей роняет вещь, зависнув над ней (вещь падает только вниз) */
   placeY: number;
   atPerch?: boolean;
 }
 /** Зависает над местом вещи на столько выше, чтобы уронить её. */
 const DROP_ABOVE = 190;
-/** …но не выше этого (лапы): с крыши верх экрана — y ≈ 0, Ворон должен быть в кадре. */
+/** …но не выше этого (лапы): с крыши верх экрана — y ≈ 0, злодей должен быть в кадре. */
 const HOVER_MIN_Y = 170;
 
 interface Point {
@@ -74,29 +96,29 @@ interface Point {
 }
 
 /**
- * Ворон-хулиган (CROW2.md). Сидит на насесте и хохочет; в полёте машет крыльями (2 кадра)
- * и несёт в клюве следующую вещь уровня — пролетая над её местом, роняет, и вещь, кружась,
- * падает туда; вещей не осталось — несёт носок.
- * На уровне (GAME.md): насест в каждой зоне, подошёл — улетает только вперёд;
- * попал паутиной — сердито каркает и улетает раньше; с последнего насеста улетает
- * за край — уровень пройден. Босс (уровень 3 мира, GAME.md): битва на арене,
- * 10 попаданий в три фазы — перелетает между насестами; зовёт голубей (пока они не в коконах,
- * неуязвим); пикирует на героя. Потом падает без сил (звёздочки кружат) и роняет вещи.
- * Корень — точка у лап; прицел — центр тела.
+ * Злодей мира (GAME.md): Ворон-хулиган, Робо-Шмель или Енот-Бандит — поведение общее,
+ * отличаются кадры, голос и то, как летают (LOOKS). Сидит на насесте и хохочет; в полёте
+ * несёт следующую вещь уровня — пролетая над её местом, роняет, и вещь, кружась, падает туда;
+ * вещей не осталось — несёт особую вещь мира (носок, дракон, торт).
+ * На уровне: насест в каждой зоне, подошёл — улетает только вперёд; попал паутиной —
+ * сердится и улетает раньше; с последнего насеста улетает за край — уровень пройден.
+ * Босс (уровень 3 мира): битва на арене, 10 попаданий в три фазы — перелетает между насестами;
+ * зовёт банду (пока она не в коконах, неуязвим); пикирует на героя. Потом падает без сил
+ * (звёздочки кружат) и роняет вещи. Корень — точка у лап; прицел — центр тела.
  */
-export class Crow implements WebTarget {
+export class Villain implements WebTarget {
   readonly root: Phaser.GameObjects.Container;
-  private laugh: Phaser.GameObjects.Image;
-  private fly: Phaser.GameObjects.Image;
+  private look: VillainLook;
+  private img: Phaser.GameObjects.Sprite;
   private carry: Phaser.GameObjects.Image;
   private carried: CarriedItem[];
-  private beak: Record<'crow_fly_1' | 'crow_fly_2', { beakX: number; beakY: number }>;
-  private dizzy: Phaser.GameObjects.Image;
+  private holdAt: Point;
+  private head: Point;
   private stars: Phaser.GameObjects.Graphics;
 
-  private state: CrowState = 'perch';
+  private state: VillainState = 'perch';
   private boss = false;
-  /** зовёт голубей — пока они не в коконах, паутина его не берёт */
+  /** зовёт банду — пока она не в коконах, паутина его не берёт */
   private shield = false;
   /** после попадания — неуязвим ещё столько */
   private hurtCd = 0;
@@ -122,44 +144,46 @@ export class Crow implements WebTarget {
 
   constructor(
     private scene: Phaser.Scene,
+    readonly kind: VillainKind,
     private perches: Perch[],
     private env: CritterEnv,
-    private opts: CrowOptions = {},
+    private opts: VillainOptions,
   ) {
     const p = perches[0];
+    this.look = LOOKS[kind];
+    const meta = scene.cache.json.get(`${kind}_meta`) as { hold: Point; head: Point };
+    this.holdAt = meta.hold;
+    this.head = meta.head;
     this.carried = [...(opts.items ?? [])].sort((a, b) => a.place - b.place);
-    this.beak = scene.cache.json.get('crow_beak');
-    this.laugh = scene.add.image(0, 0, scaledTexture(scene, 'crow_laugh', LAUGH_SCALE)).setOrigin(0.5, 1);
-    this.fly = scene.add.image(BEAK.x, BEAK.y, scaledTexture(scene, 'crow_fly_1', FLY_SCALE)).setVisible(false);
-    // вещь в клюве — только в полёте: на насесте он хохочет с раскрытым клювом
-    this.carry = scene.add.image(BEAK.x, BEAK.y, 'sock').setOrigin(0.5, 0.15).setVisible(false);
-    this.dizzy = scene.add.image(0, 0, scaledTexture(scene, 'crow_dizzy', DIZZY_SCALE)).setOrigin(0.5, 1).setVisible(false);
+    // опора кадров атласа — у лап: отражение (flipX) зеркалит вокруг неё
+    this.img = scene.add.sprite(0, 0, kind, 'laugh');
+    // вещь — только в полёте: на насесте он хохочет
+    this.carry = scene.add.image(this.holdAt.x, this.holdAt.y, opts.special).setOrigin(0.5, 0.15).setVisible(false);
     this.stars = scene.add.graphics();
     this.shieldG = scene.add.graphics();
-    this.root = scene.add.container(p.x, p.y, [this.laugh, this.fly, this.carry, this.dizzy, this.stars, this.shieldG]).setDepth(8);
+    this.root = scene.add.container(p.x, p.y, [this.img, this.carry, this.stars, this.shieldG]).setDepth(8);
     this.setCarry();
   }
 
   /**
-   * Уменьшенные копии всех картинок — заранее, при загрузке уровня: созданная на лету
-   * (первый взмах, новая вещь в клюве) — это canvas и загрузка в видеокарту, рывок кадра.
+   * Уменьшенные копии вещей — заранее, при загрузке уровня: созданная на лету
+   * (новая вещь в лапах) — это canvas и загрузка в видеокарту, рывок кадра.
    */
   prewarm(itemKeys: string[]) {
-    for (const f of ['crow_fly_1', 'crow_fly_2']) scaledTexture(this.scene, f, FLY_SCALE);
-    for (const key of [...itemKeys, 'sock']) {
+    for (const key of [...itemKeys, this.opts.special]) {
       const src = this.scene.textures.get(key).getSourceImage();
       scaledTexture(this.scene, key, CARRY_SIZE / Math.max(src.width, src.height));
     }
   }
 
-  /** В клюве — следующая вещь, а когда вещей не осталось — носок (или что дали боссу). */
+  /** В лапах — следующая вещь, а когда вещей не осталось — особая вещь мира (или что дали боссу). */
   private setCarry(force?: string) {
-    const key = force ?? this.carried[0]?.key ?? 'sock';
+    const key = force ?? this.carried[0]?.key ?? this.opts.special;
     const src = this.scene.textures.get(key).getSourceImage();
     this.carry.setTexture(scaledTexture(this.scene, key, CARRY_SIZE / Math.max(src.width, src.height)));
   }
 
-  /** Роняет вещь из клюва: она падает в своё место (Item.drop), в клюве — следующая. */
+  /** Роняет вещь: она падает в своё место (Item.drop), в лапах — следующая. */
   private dropCarried() {
     const it = this.carried.shift();
     if (!it) return;
@@ -167,7 +191,7 @@ export class Crow implements WebTarget {
     this.opts.onDrop?.(it.key, m.tx, m.ty + 20);
     this.setCarry();
     this.kick(0.1);
-    feedback.caw(1.2);
+    this.look.voice(1.2);
   }
 
   /** Сидит на последнем насесте уровня — ждёт финальной сценки (сам не улетает). */
@@ -175,7 +199,7 @@ export class Crow implements WebTarget {
     return !this.boss && this.state === 'perch' && this.perch === this.perches.length - 1;
   }
 
-  /** Финальная сценка: взлетает с носком, делает дразнящую мёртвую петлю над (x, y) и улетает за край. */
+  /** Финальная сценка: взлетает с особой вещью, делает дразнящую мёртвую петлю над (x, y) и улетает за край. */
   tease(x: number, y: number) {
     this.startFlight({ x, y }, { x, y }, 1.4);
     this.state = 'tease';
@@ -186,19 +210,22 @@ export class Crow implements WebTarget {
     if (this.state === 'perch') this.flee();
   }
 
-  /** Кадр взмаха и вещь под клювом: картинки выровнены по клюву, при отражении — зеркально. */
-  private flap() {
-    const frame = Math.floor(this.t * FLAP_FPS) % 2 === 0 ? 'crow_fly_1' : 'crow_fly_2';
-    const flip = this.facing < 0;
-    const f = this.fly.setTexture(scaledTexture(this.scene, frame, FLY_SCALE)).setFlipX(flip);
-    const src = this.scene.textures.get(frame).getSourceImage();
-    const b = this.beak[frame];
-    f.setOrigin(flip ? 1 - b.beakX / src.width : b.beakX / src.width, b.beakY / src.height);
-    // корпус чуть поднимается на взмахе вниз и опускается на взмахе вверх
-    const bob = frame === 'crow_fly_1' ? 5 : -5;
-    f.setPosition(BEAK.x * this.facing, BEAK.y + bob);
-    // вещь — маятником в такт взмахам
-    this.carry.setPosition(BEAK.x * this.facing, BEAK.y + bob).setFlipX(flip).setAngle(10 * Math.sin(this.t * FLAP_FPS * Math.PI));
+  /**
+   * Кадр полёта и вещь в лапах. Опора кадров — у лап, поэтому отражение просто зеркалит
+   * вокруг корня; вещь — в точке hold, качается маятником в такт.
+   */
+  private flap(rising = false) {
+    const L = this.look;
+    const i = Math.floor(this.t * L.flyFps) % L.fly.length;
+    const frame = rising && L.rise ? L.rise : L.fly[i];
+    this.img.setFrame(frame).setFlipX(this.facing < 0);
+    // шмель жужжит — мелкая дрожь; остальные чуть поднимаются на взмахе
+    const bob = this.kind === 'bumblebee' ? Math.sin(this.t * 40) * 1.5 : i % 2 === 0 ? 0 : -3;
+    this.img.setY(bob);
+    this.carry
+      .setPosition(this.holdAt.x * this.facing, this.holdAt.y + bob)
+      .setFlipX(this.facing < 0)
+      .setAngle(10 * Math.sin(this.t * Math.min(L.flyFps, 8) * Math.PI));
   }
 
   get alive() {
@@ -213,7 +240,7 @@ export class Crow implements WebTarget {
   }
 
   /**
-   * Битва с боссом: прилетает на арену (насесты perches), в клюве — carryKey.
+   * Битва с боссом: прилетает на арену (насесты perches), в лапах — carryKey.
    * Дальше — фазы по попаданиям (hit).
    */
   startBoss(perches: Perch[], carryKey: string) {
@@ -228,6 +255,7 @@ export class Crow implements WebTarget {
   /** Зовёт волну шалунов и прячется под щит, пока их не переловят. */
   private summon(wave: number) {
     this.shield = true;
+    this.img.clearTint();
     this.opts.onSummon?.(wave);
     if (this.state === 'perch') this.laughNow();
   }
@@ -238,8 +266,8 @@ export class Crow implements WebTarget {
     this.shield = false;
     this.env.sparks.burst(this.x, this.y, 24);
     this.kick(-0.2);
-    this.diveIn = 0.8;
-    feedback.caw(0.8);
+    this.diveIn = AFTER_SHIELD;
+    this.look.voice(0.8);
   }
 
   /** Сразу расхохотаться (крупный план). */
@@ -247,7 +275,7 @@ export class Crow implements WebTarget {
     this.laughT = 0;
     this.nextLaugh = 1.2;
     this.kick(0.14);
-    feedback.caw();
+    this.look.voice();
   }
   get x() { return this.root.x; }
   get y() { return this.root.y - 100; }
@@ -260,7 +288,7 @@ export class Crow implements WebTarget {
     if (!this.boss) {
       // на уровне не падает — сердится и улетает раньше; с последнего насеста не улетает:
       // там его ждёт финальная сценка или битва
-      feedback.caw(0.85);
+      this.look.voice(0.85);
       if (this.state === 'perch' && !this.atLastPerch) this.flee();
       return;
     }
@@ -269,11 +297,11 @@ export class Crow implements WebTarget {
       this.toDizzy();
       return;
     }
-    feedback.caw(0.85);
+    this.look.voice(0.85);
     this.hurtCd = HURT_CD;
     const wave = SUMMON_AT.indexOf(this.hits);
     if (wave > 0) {
-      // новая волна: зовёт шалунов и хохочет под щитом
+      // новая волна: зовёт банду и хохочет под щитом
       this.summon(wave);
       return;
     }
@@ -327,32 +355,48 @@ export class Crow implements WebTarget {
     const hero = this.env.hero;
     const dx = hero.x - this.root.x;
     this.facing = Math.sign(dx) || this.facing;
-    this.laugh.setFlipX(this.facing < 0);
+    const img = this.img;
 
-    // хохочет: трясётся и подпрыгивает, «кар-кар»
+    // хохочет: трясётся и подпрыгивает
     const near = Math.abs(dx) < TEASE_DIST;
     if (this.laughT >= 0) {
       this.laughT += dt;
-      this.laugh
+      img.setFrame('laugh')
         .setRotation(Math.sin(this.laughT * 28) * 0.06)
         .setScale(1, 1 + 0.05 * Math.abs(Math.sin(this.laughT * 20)));
       if (this.laughT > 0.9) this.laughT = -1;
     } else {
-      this.laugh.setRotation(0).setScale(1, 1 + 0.012 * Math.sin(this.t * 3));
+      // шмель висит в воздухе и машет крыльями, остальные просто дышат
+      if (this.look.hover) this.flap();
+      else img.setFrame('laugh');
+      img.setRotation(0).setScale(1, 1 + 0.012 * Math.sin(this.t * 3));
+      this.carry.setVisible(false);
       this.nextLaugh -= dt;
       if (this.nextLaugh <= 0 && near) {
         this.laughT = 0;
         this.nextLaugh = Phaser.Math.FloatBetween(2.2, 3.5);
-        feedback.caw();
+        this.look.voice();
       }
     }
+    img.setFlipX(this.facing < 0);
+    if (this.look.hover) img.setY(Math.sin(this.t * 2.4) * 10);
 
     if (this.hold || this.atLastPerch) return;
-    if (this.boss && this.hits >= DIVE_FROM && !this.shield) {
-      // фаза 3: посидел — пикирует на героя
+    if (this.boss && !this.shield) {
+      // банда в коконах: посидел — краснеет и трясётся — пикирует на героя
+      const was = this.diveIn;
       this.diveIn -= dt;
+      if (this.diveIn < DIVE_WARN) {
+        if (was >= DIVE_WARN) feedback.squawk();
+        img.setRotation(Math.sin(this.t * 60) * 0.08);
+        if (Math.sin(this.t * 30) > 0) img.setTint(0xff9a8a);
+        else img.clearTint();
+      }
       if (this.diveIn <= 0) {
-        this.diveIn = Phaser.Math.FloatBetween(...DIVE_PAUSE);
+        img.clearTint();
+        // чем ближе к победе, тем чаще
+        const k = 1 - 0.4 * (this.hits / BOSS_HITS);
+        this.diveIn = Phaser.Math.FloatBetween(...DIVE_PAUSE) * k;
         this.dive();
         return;
       }
@@ -384,7 +428,7 @@ export class Crow implements WebTarget {
     this.flyTo(pool[0].i, pool[0].p);
   }
 
-  /** Улетает с носком вверх-вправо за край экрана — дальше уровень заканчивается. */
+  /** Улетает вверх-вправо за край экрана — дальше уровень заканчивается. */
   private escape() {
     const cur = { x: this.root.x, y: this.root.y };
     this.startFlight(cur, { x: cur.x + 1700, y: cur.y - 900 }, 2.2);
@@ -400,8 +444,8 @@ export class Crow implements WebTarget {
     const cur = { x: this.root.x, y: this.root.y };
     const next = this.carried[0];
     if (next && !next.atPerch && (next.place - cur.x) * (p.x - cur.x) > 0 && Math.abs(next.place - cur.x) < Math.abs(p.x - cur.x)) {
-      // клюв (BEAK.y над лапами) остаётся выше места — вещь падает только вниз
-      const over = { x: next.place, y: Math.min(Math.max(next.placeY - DROP_ABOVE, HOVER_MIN_Y), next.placeY - BEAK.y - 30) };
+      // вещь (hold.y над лапами) остаётся выше места — падает только вниз
+      const over = { x: next.place, y: Math.min(Math.max(next.placeY - DROP_ABOVE, HOVER_MIN_Y), next.placeY - this.holdAt.y - 30) };
       this.after = { i, p };
       this.startFlight(over, over, Math.max(0.7, Math.hypot(over.x - cur.x, over.y - cur.y) / FLY_SPEED));
       return;
@@ -425,12 +469,11 @@ export class Crow implements WebTarget {
     this.facing = Math.sign(end.x - cur.x) || this.facing;
     this.showFlight();
     this.kick(0.12);
-    feedback.caw(1.1);
+    this.look.voice(1.1);
   }
 
   private showFlight() {
-    this.laugh.setVisible(false);
-    this.fly.setVisible(true);
+    this.img.setRotation(0).setScale(1).clearTint();
     this.carry.setVisible(true);
     this.flap();
   }
@@ -444,8 +487,10 @@ export class Crow implements WebTarget {
     const prevY = this.root.y;
     this.root.x = a * this.from.x + b * this.ctrl.x + c * this.to.x;
     this.root.y = a * this.from.y + b * this.ctrl.y + c * this.to.y;
-    // взмахи, наклон по ходу
-    this.flap();
+    // кадр полёта (енот на подъёме — прыжок с зонтом), наклон по ходу
+    this.flap(this.root.y < prevY - 0.5);
+    // в пике за ним тянется хвост искр
+    if (this.state === 'dive' && Math.floor(this.stateT * 25) !== Math.floor((this.stateT - _dt) * 25)) this.env.sparks.burst(this.x, this.y, 2);
     // в финале — мёртвая петля в середине подлёта, иначе — наклон по ходу
     const loop = this.state === 'tease' ? Phaser.Math.Clamp((u - 0.35) / 0.5, 0, 1) : 0;
     this.root.setRotation(
@@ -460,7 +505,7 @@ export class Crow implements WebTarget {
       return;
     }
     if (u >= 1 && this.state === 'tease') {
-      feedback.caw(1.15);
+      this.look.voice(1.15);
       this.escape();
       return;
     }
@@ -474,9 +519,8 @@ export class Crow implements WebTarget {
       this.state = 'perch';
       this.stateT = 0;
       this.root.setRotation(0);
-      this.fly.setVisible(false);
       this.carry.setVisible(false);
-      this.laugh.setVisible(true);
+      this.img.setFrame('laugh').setY(0);
       this.kick(-0.14);
       // сел — и сразу дразнится
       this.nextLaugh = 0.25;
@@ -486,16 +530,14 @@ export class Crow implements WebTarget {
   private toDizzy() {
     this.state = 'dizzy';
     this.stateT = 0;
-    this.laugh.setVisible(false);
-    this.fly.setVisible(false);
     this.carry.setVisible(false);
     this.root.setRotation(0);
-    this.dizzy.setVisible(true).setFlipX(false);
+    this.img.setFrame('dizzy').setFlipX(false).setRotation(0).setScale(1).setY(0);
     this.vy = -320;
     this.bounces = 0;
     feedback.dizzy();
     this.env.sparks.burst(this.x, this.y, 16);
-    // вещи выпадают из клюва — их роняет сцена (обычные предметы уровня)
+    // вещи выпадают из лап — их роняет сцена (обычные предметы уровня)
     this.opts.onDefeat?.(this.x, this.y);
   }
 
@@ -529,20 +571,21 @@ export class Crow implements WebTarget {
     for (let i = 0; i < 3; i++) {
       const a = this.t * 4 + (i * Math.PI * 2) / 3;
       const depth = 0.5 + 0.5 * Math.sin(a);
-      const x = DIZZY_HEAD.x + Math.cos(a) * 48;
-      const y = DIZZY_HEAD.y + Math.sin(a) * 12;
+      const x = this.head.x + Math.cos(a) * 48;
+      const y = this.head.y + Math.sin(a) * 12;
       drawStar(g, x, y, 7 + 4 * depth, this.t * 3 + i, 0.55 + 0.45 * depth);
     }
   }
 
-  /** Щит босса: мерцающий бирюзовый пузырь — паутина его не берёт. */
+  /** Щит босса: мерцающий пузырь цвета злодея — паутина его не берёт. */
   private drawShield() {
     const g = this.shieldG;
     g.clear();
     if (!this.shield || this.state === 'dizzy') return;
     const r = 120 + 6 * Math.sin(this.t * 5);
-    g.fillStyle(0x5ff5e6, 0.12).fillCircle(0, -100, r);
-    g.lineStyle(4, 0xbffcf4, 0.55 + 0.25 * Math.sin(this.t * 7)).strokeCircle(0, -100, r);
+    const c = this.look.shield;
+    g.fillStyle(c, 0.12).fillCircle(0, -100, r);
+    g.lineStyle(4, c, 0.55 + 0.25 * Math.sin(this.t * 7)).strokeCircle(0, -100, r);
     g.lineStyle(2, 0xffffff, 0.35).beginPath().arc(0, -100, r - 14, -2.4 + this.t, -1.4 + this.t).strokePath();
   }
 
@@ -552,11 +595,8 @@ export class Crow implements WebTarget {
   }
 
   private flashWhite() {
-    const imgs = [this.laugh, this.fly];
-    for (const i of imgs) i.setTintFill(0xffffff);
-    this.scene.time.delayedCall(90, () => {
-      for (const i of imgs) i.clearTint();
-    });
+    this.img.setTintFill(0xffffff);
+    this.scene.time.delayedCall(90, () => this.img.clearTint());
   }
 }
 

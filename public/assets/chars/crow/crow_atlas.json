@@ -1,0 +1,108 @@
+{
+ "frames": {
+  "fly_1": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 217,
+    "h": 212
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 217,
+    "h": 212
+   },
+   "sourceSize": {
+    "w": 217,
+    "h": 212
+   },
+   "pivot": {
+    "x": 0.5652,
+    "y": 1.1887
+   }
+  },
+  "fly_2": {
+   "frame": {
+    "x": 219,
+    "y": 0,
+    "w": 234,
+    "h": 158
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 234,
+    "h": 158
+   },
+   "sourceSize": {
+    "w": 234,
+    "h": 158
+   },
+   "pivot": {
+    "x": 0.5962,
+    "y": 1.2276
+   }
+  },
+  "laugh": {
+   "frame": {
+    "x": 455,
+    "y": 0,
+    "w": 161,
+    "h": 212
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 161,
+    "h": 212
+   },
+   "sourceSize": {
+    "w": 161,
+    "h": 212
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 1.0
+   }
+  },
+  "dizzy": {
+   "frame": {
+    "x": 618,
+    "y": 0,
+    "w": 222,
+    "h": 131
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 222,
+    "h": 131
+   },
+   "sourceSize": {
+    "w": 222,
+    "h": 131
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 1.0
+   }
+  }
+ },
+ "meta": {
+  "image": "crow_atlas.png",
+  "size": {
+   "w": 842,
+   "h": 212
+  },
+  "scale": "1"
+ }
+}

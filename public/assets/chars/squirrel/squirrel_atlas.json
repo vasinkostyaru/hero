@@ -1,0 +1,156 @@
+{
+ "frames": {
+  "idle_1": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 123,
+    "h": 113
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 123,
+    "h": 113
+   },
+   "sourceSize": {
+    "w": 123,
+    "h": 113
+   },
+   "pivot": {
+    "x": 0.565,
+    "y": 0.9904
+   }
+  },
+  "idle_2": {
+   "frame": {
+    "x": 125,
+    "y": 0,
+    "w": 108,
+    "h": 105
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 108,
+    "h": 105
+   },
+   "sourceSize": {
+    "w": 108,
+    "h": 105
+   },
+   "pivot": {
+    "x": 0.5988,
+    "y": 1.0274
+   }
+  },
+  "reach": {
+   "frame": {
+    "x": 235,
+    "y": 0,
+    "w": 113,
+    "h": 107
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 113,
+    "h": 107
+   },
+   "sourceSize": {
+    "w": 113,
+    "h": 107
+   },
+   "pivot": {
+    "x": 0.5849,
+    "y": 1.0168
+   }
+  },
+  "windup": {
+   "frame": {
+    "x": 350,
+    "y": 0,
+    "w": 122,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 122,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 122,
+    "h": 116
+   },
+   "pivot": {
+    "x": 0.5658,
+    "y": 0.9907
+   }
+  },
+  "throw": {
+   "frame": {
+    "x": 474,
+    "y": 0,
+    "w": 125,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 125,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 125,
+    "h": 116
+   },
+   "pivot": {
+    "x": 0.5642,
+    "y": 0.9564
+   }
+  },
+  "laugh": {
+   "frame": {
+    "x": 601,
+    "y": 0,
+    "w": 112,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 112,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 112,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.6814,
+    "y": 0.9608
+   }
+  }
+ },
+ "meta": {
+  "image": "squirrel_atlas.png",
+  "size": {
+   "w": 715,
+   "h": 120
+  },
+  "scale": "1"
+ }
+}

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PARALLAX } from '../config/game';
+import { THEMES, themed, type ThemeKey } from './Theme';
 
 /** Насколько слои двигаются по вертикали относительно горизонтали. */
 const VERTICAL = 0.35;
@@ -7,7 +8,6 @@ const VERTICAL = 0.35;
 const SKY_SCALE = 1.16;
 /** Облака плывут туда-обратно: центр и размах сдвига неба, px. */
 const SKY_DRIFT = 70;
-const WINDOWS_PER_HALF = 22;
 /** С какой высоты в слоях города начинается непрозрачное (с запасом на размытие). */
 const OPAQUE_TOP: Record<string, number> = { city_far: 470, city_mid: 715 };
 
@@ -29,7 +29,8 @@ interface WindowLight {
  * - Города бесшовные, но 5052 px больше лимита текстуры телефонов (4096) — разрезаны
  *   на половины _a/_b (art/split_bg.py) и собираются из картинок A B A B.
  * - Дальний город размыт заранее (canvas filter при загрузке) — во время игры ноль проходов;
- *   поверх — огоньки окон, которые иногда загораются и гаснут.
+ *   поверх — огоньки окон, которые иногда загораются и гаснут (ночью их больше).
+ * - Время суток и погода (world/Theme.ts) — перекрашенные один раз копии тех же картинок.
  */
 export class Parallax {
   private sky: Phaser.GameObjects.Image[] = [];
@@ -37,15 +38,20 @@ export class Parallax {
   private windows: WindowLight[] = [];
   private t = 0;
 
-  constructor(private scene: Phaser.Scene, worldW: number) {
+  private windowsPerHalf: number;
+
+  constructor(private scene: Phaser.Scene, worldW: number, theme: ThemeKey = 'sunset') {
+    this.windowsPerHalf = THEMES[theme].windows;
+    const sky = themed(scene, 'sky', theme, 'sky');
+    const city = (k: string) => themed(scene, k, theme, 'city');
     // столько копий неба, чтобы хватило на весь уровень с отъездом камеры и дрейфом облаков
     const viewW = scene.scale.width / 0.92;
     const need = viewW + PARALLAX.sky * Math.max(0, worldW - scene.scale.width) + SKY_DRIFT * 2 + 20;
-    const skyW = scene.textures.get('sky').getSourceImage().width * SKY_SCALE;
+    const skyW = scene.textures.get(sky).getSourceImage().width * SKY_SCALE;
     for (let i = 0; i < Math.ceil(need / skyW); i++) {
       this.sky.push(
         scene.add
-          .image(i * skyW, -90, 'sky')
+          .image(i * skyW, -90, sky)
           .setOrigin(0, 0)
           .setScale(SKY_SCALE)
           .setFlipX(i % 2 === 1)
@@ -55,20 +61,21 @@ export class Parallax {
     }
 
     // лёгкое размытие дальнего города — «воздушная перспектива»
-    for (const k of ['city_far_a', 'city_far_b']) blurredCopy(scene, k, 1.6);
-    const farParts = this.add('city_far', '@blur', PARALLAX.cityFar, -90);
-    this.addWindows(farParts);
-    this.add('city_mid', '', PARALLAX.cityMid, -80);
+    const far = ['city_far_a', 'city_far_b'].map((k) => blurredCopy(scene, city(k), 1.6));
+    const farParts = this.add('city_far', far, PARALLAX.cityFar, -90);
+    this.addWindows(farParts, ['city_far_a', 'city_far_b'].map(city));
+    this.add('city_mid', ['city_mid_a', 'city_mid_b'].map(city), PARALLAX.cityMid, -80);
   }
 
-  private add(key: string, suffix: string, factor: number, depth: number) {
-    const src = this.scene.textures.get(`${key}_a`).getSourceImage();
+  /** keys — половины слоя a и b (уже в цветах темы). */
+  private add(key: string, keys: string[], factor: number, depth: number) {
+    const src = this.scene.textures.get(keys[0]).getSourceImage();
     const half = src.width;
     // верх слоёв города полностью прозрачный — не рисуем его (на телефоне закраска пикселей дорогая)
     const top = OPAQUE_TOP[key] ?? 0;
     const parts = [0, 1, 2, 3].map((i) =>
       this.scene.add
-        .image(i * half, 0, `${key}_${i % 2 ? 'b' : 'a'}${suffix}`)
+        .image(i * half, 0, keys[i % 2])
         .setOrigin(0, 0)
         .setCrop(0, top, half, src.height - top)
         .setScrollFactor(factor, factor * VERTICAL)
@@ -79,8 +86,8 @@ export class Parallax {
   }
 
   /** Тёплые огоньки в окнах дальнего города: точки берём там, где у слоя непрозрачные дома. */
-  private addWindows(parts: Phaser.GameObjects.Image[]) {
-    const spots = ['city_far_a', 'city_far_b'].map((k) => this.findSpots(k));
+  private addWindows(parts: Phaser.GameObjects.Image[], keys: string[]) {
+    const spots = keys.map((k) => this.findSpots(k));
     parts.forEach((part, pi) => {
       for (const s of spots[pi % 2]) {
         const img = this.scene.add
@@ -106,7 +113,7 @@ export class Parallax {
     ctx.drawImage(src, 0, 0);
     const data = ctx.getImageData(0, 0, c.width, c.height).data;
     const spots: { x: number; y: number }[] = [];
-    for (let tries = 0; tries < 4000 && spots.length < WINDOWS_PER_HALF; tries++) {
+    for (let tries = 0; tries < 4000 && spots.length < this.windowsPerHalf; tries++) {
       const x = Math.floor(Math.random() * c.width);
       const y = Math.floor(c.height * (0.62 + Math.random() * 0.33));
       const i = (y * c.width + x) * 4;
@@ -141,14 +148,15 @@ export class Parallax {
   }
 }
 
-/** Размытая копия текстуры (ключ + '@blur'), один раз при загрузке. */
+/** Размытая копия текстуры (ключ + '@blur'), один раз при загрузке. Возвращает её ключ. */
 function blurredCopy(scene: Phaser.Scene, key: string, px: number) {
   const dst = `${key}@blur`;
-  if (scene.textures.exists(dst)) return;
+  if (scene.textures.exists(dst)) return dst;
   const src = scene.textures.get(key).getSourceImage() as HTMLImageElement;
   const t = scene.textures.createCanvas(dst, src.width, src.height)!;
   const ctx = t.getContext();
   ctx.filter = `blur(${px}px)`;
   ctx.drawImage(src, 0, 0);
   t.refresh();
+  return dst;
 }

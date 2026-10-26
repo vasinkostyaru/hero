@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { FAR_TINT, GROUND_Y } from '../config/game';
 import { addScaledImage } from './textures';
+import { graded } from './Vignette';
 
 /** Рост героя на экране — от него считаем масштаб декора. */
 const HERO_H = 216;
@@ -26,7 +27,7 @@ export function addProps(scene: Phaser.Scene, props: PropDef[]) {
     // дальний декор стоит за карнизом (его низ прячется), ближний — на крыше
     const y = p.y ?? (p.far ? GROUND_Y - 6 : GROUND_Y + 4);
     const img = addScaledImage(scene, p.x, y, p.key, scale).setOrigin(0.5, 1);
-    if (p.far) img.setTint(FAR_TINT).setDepth(-1);
+    if (p.far) img.setTint(graded(FAR_TINT)).setDepth(-1);
     else img.setDepth(6);
     placed.push({ def: p, img });
   }

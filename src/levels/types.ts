@@ -1,4 +1,6 @@
 import type { PlatformLook } from '../world/Platforms';
+import type { ThemeKey } from '../world/Theme';
+import type { WorldId } from './worlds';
 
 /**
  * Описание уровня: секции-зоны по ~1–1.5 экрана. Внутри секции x — от её левого края,
@@ -7,10 +9,12 @@ import type { PlatformLook } from '../world/Platforms';
 export interface LevelDef {
   /** номер уровня на карте (src/config/levels.json) */
   id: number;
+  /** мир: злодей, особая вещь, фон слотов (levels/worlds.ts) */
+  world: WorldId;
+  /** небо, свет и погода (world/Theme.ts) */
+  theme: ThemeKey;
   /** 3 предмета уровня по порядку слотов (ключи картинок в assets/items) */
   items: string[];
-  /** фон слотов: мир 1 — бельевая верёвка (мир 2 — полка, мир 3 — стол) */
-  slots: 'rope';
   sections: SectionDef[];
 }
 
@@ -35,8 +39,8 @@ export interface SectionDef {
   lamps?: { x: number }[];
   critters?: CritterDef[];
   items?: ItemDef[];
-  /** насест злодея в этой зоне (точка у лап); drop — предмет, который он роняет, улетая */
-  crow?: { x: number; y: number; drop?: string };
+  /** насест злодея в этой зоне (точка у лап; шмель висит в воздухе); drop — предмет, который он роняет, улетая */
+  perch?: { x: number; y: number; drop?: string };
   /** место под будущего шалуна (кот, белка, голубь-толстяк) — пока стоит существующий */
   slot?: string;
   /**
@@ -68,7 +72,11 @@ export interface PropDefLocal {
 export type CritterDef =
   | { kind: 'drone' | 'drone2'; x: number; y: number; id?: string }
   | { kind: 'pigeon'; x: number; floorY: number; minX: number; maxX: number; id?: string }
-  | { kind: 'seagull'; x: number; y: number; range: number; id?: string };
+  | { kind: 'seagull'; x: number; y: number; range: number; id?: string }
+  /** робот-пылесос катается по дорожке, увидел героя — газует и мчится на него */
+  | { kind: 'vacuum'; x: number; floorY: number; minX: number; maxX: number; id?: string }
+  /** белка сидит на антенне, трубе или мостике и кидается жёлудями */
+  | { kind: 'squirrel'; x: number; floorY: number; id?: string };
 
 export interface ItemDef {
   key: string;
@@ -76,7 +84,7 @@ export interface ItemDef {
   y: number;
   /** сторож: id шалуна — пока он не в коконе, предмет не взять */
   guard?: string;
-  /** у злодея в клюве: появляется, когда он роняет его над этим местом (CROW2.md) */
+  /** у злодея в клюве/лапах: появляется, когда он роняет его над этим местом (CROW2.md) */
   carried?: boolean;
   /** висит на тележке с крюком (id тележки) — едет вместе с ней */
   attach?: string;

@@ -14,6 +14,10 @@ export interface ButtonLayout {
 const BY = GAME_H - 175;
 /** Отступ от боковых краёв — чтобы кнопки не попадали под вырез камеры и закругления экрана. */
 const SIDE = 60;
+/** Выше этого касание — не управление: там пауза, домик и слоты предметов. */
+const ZONE_TOP = 260;
+/** Ширина экрана — для деления на левую и правую половины. */
+let screenW = 1920;
 
 /** Слева ← →, справа прыжок (крупнее) и паутина. Правые кнопки прижаты к правому краю экрана. */
 export const BUTTONS: ButtonLayout[] = [
@@ -25,6 +29,7 @@ export const BUTTONS: ButtonLayout[] = [
 
 /** Расставляет кнопки под текущую ширину экрана (она зависит от телефона). */
 export function layoutButtons(width: number) {
+  screenW = width;
   const pos: Record<ButtonId, number> = {
     left: SIDE + 175,
     right: SIDE + 420,
@@ -83,13 +88,21 @@ export class TouchControls implements GameInput {
     this.taps.clear();
   }
 
+  /**
+   * Кнопки — только подсказка: весь экран ниже верхней полосы поделён на зоны.
+   * Левая половина — ходьба: левее середины между ← и → — влево, правее — вправо.
+   * Правая половина — ближайшая из «прыжок» и «паутина». Детский палец, промахнувшись
+   * мимо кружка, всё равно делает то, что хотел, а скользя — переходит с кнопки на кнопку.
+   */
   private hit(x: number, y: number) {
-    // зона касания чуть больше нарисованной кнопки — детским пальцам проще попасть
-    let best: ButtonLayout | null = null;
+    if (y < ZONE_TOP) return null;
+    const side = BUTTONS.filter((b) => (x < screenW / 2) === (b.id === 'left' || b.id === 'right'));
+    let best = side[0];
     let bestD = Infinity;
-    for (const b of BUTTONS) {
-      const d = Math.hypot(x - b.x, y - b.y);
-      if (d < b.r * 1.3 && d < bestD) {
+    for (const b of side) {
+      // ← и → делим только по x; прыжок и паутину — по расстоянию до центра (прыжок крупнее — его зона шире)
+      const d = b.id === 'left' || b.id === 'right' ? Math.abs(x - b.x) : Math.hypot(x - b.x, y - b.y) / b.r;
+      if (d < bestD) {
         best = b;
         bestD = d;
       }

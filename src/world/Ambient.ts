@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { graded } from './Vignette';
 
 /** Дымок из трубы: медленный, полупрозрачный, тёплый. */
 export function addChimneySmoke(scene: Phaser.Scene, x: number, y: number, far = false) {
@@ -16,8 +17,8 @@ export function addChimneySmoke(scene: Phaser.Scene, x: number, y: number, far =
     .setDepth(far ? -2 : 5);
 }
 
-/** Редкие золотые пылинки по всей сцене: появляются у камеры, медленно плывут и гаснут. */
-export function addGoldenMotes(scene: Phaser.Scene, glowLayer: Phaser.GameObjects.Layer) {
+/** Редкие пылинки (на закате золотые, ночью — светлячки) по всей сцене: появляются у камеры, медленно плывут и гаснут. */
+export function addGoldenMotes(scene: Phaser.Scene, glowLayer: Phaser.GameObjects.Layer, tint = 0xffd27a) {
   const cam = scene.cameras.main;
   const emitter = scene.make.particles(
     {
@@ -35,7 +36,7 @@ export function addGoldenMotes(scene: Phaser.Scene, glowLayer: Phaser.GameObject
           onEmit: () => 0,
           onUpdate: (_p: Phaser.GameObjects.Particles.Particle, _k: string, t: number) => Math.sin(t * Math.PI) * 0.85,
         },
-        tint: 0xffd27a,
+        tint,
         blendMode: Phaser.BlendModes.ADD,
         emitZone: {
           type: 'random',
@@ -100,9 +101,8 @@ export class Lamp {
   }
 }
 
-/** Тон спущенного (ещё не взятого) флага и тон после подъёма (как общий тёплый тон сцены). */
+/** Тон спущенного (ещё не взятого) флага; поднятый — в общем тоне сцены (graded). */
 const FLAG_OFF = 0x7a6a8a;
-const FLAG_ON = 0xffeedd;
 /** Насколько спущено полотнище у не взятого флага. */
 const FLAG_LOWER = 120;
 
@@ -147,7 +147,7 @@ export class Flag {
     }
     this.active = active;
     this.lower = active ? 0 : FLAG_LOWER;
-    for (const s of this.strips) s.img.setTint(active ? FLAG_ON : FLAG_OFF);
+    for (const s of this.strips) s.img.setTint(active ? graded(0xffffff) : FLAG_OFF);
   }
 
   /** Герой добежал: полотнище взлетает вверх и загорается цветом. */
@@ -155,7 +155,7 @@ export class Flag {
     if (this.active) return;
     this.active = true;
     this.scene.tweens.add({ targets: this, lower: 0, duration: 520, ease: 'Back.Out' });
-    for (const s of this.strips) s.img.setTint(FLAG_ON);
+    for (const s of this.strips) s.img.setTint(graded(0xffffff));
   }
 
   update(dt: number) {

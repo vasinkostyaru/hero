@@ -11,6 +11,9 @@ import { Pigeon } from './Pigeon';
 import { Bouncer, Cradle, POST_COLOR, Trolley, addAwning, addClothesline, addLongPlatform, addStreet, meta, type PlatformLook } from './Platforms';
 import { addProps } from './Props';
 import { Seagull } from './Seagull';
+import { Squirrel } from './Squirrel';
+import { Vacuum } from './Vacuum';
+import { graded } from './Vignette';
 import { addTiled, scaledTexture } from './textures';
 
 export type SolidKind = 'roof' | 'platform' | 'wall' | 'box';
@@ -32,7 +35,6 @@ export interface Solid {
 const PLATFORM_DEPTH = 7;
 /** Тон кирпича под палитру заката: чуть темнее и в сиреневый, как всё, что стоит в тени. */
 const BRICK_TINT = 0xd9c6d6;
-const RIM_COLOR = 0xffb46a;
 const OUTLINE = 0x1c0c2a;
 /** Ящик по пояс герою: crate.png (265 px) × 0.42 ≈ 110 px. */
 const CRATE_SCALE = 0.42;
@@ -89,6 +91,8 @@ export class Level {
     def: LevelDef,
     private env: CritterEnv,
     private glowLayer: Phaser.GameObjects.Layer,
+    /** блик по краю стен со стороны света (тема уровня) */
+    private rim = 0xffb46a,
   ) {
     makeShadeTextures(scene);
     let x0 = 0;
@@ -151,7 +155,7 @@ export class Level {
       this.flags.push(flag);
       sec.updaters.push(flag);
     }
-    if (sd.crow) this.perches.push({ ...sd.crow, x: X(sd.crow.x) });
+    if (sd.perch) this.perches.push({ ...sd.perch, x: X(sd.perch.x) });
     if (sd.arena) this.arena = { x: x0, perches: sd.arena.perches.map((p) => ({ ...p, x: X(p.x) })), waves: sd.arena.waves };
 
     for (const c of sd.critters ?? []) {
@@ -212,6 +216,10 @@ export class Level {
         return new Pigeon(this.scene, X(c.x), c.floorY, X(c.minX), X(c.maxX), this.env);
       case 'seagull':
         return new Seagull(this.scene, X(c.x), c.y, c.range, this.env);
+      case 'vacuum':
+        return new Vacuum(this.scene, X(c.x), c.floorY, X(c.minX), X(c.maxX), this.env);
+      case 'squirrel':
+        return new Squirrel(this.scene, X(c.x), c.floorY, this.env);
     }
   }
 
@@ -341,7 +349,7 @@ export class Level {
     for (const k of [0.16, 0.84]) {
       const px = s.x + s.w * k;
       add.rectangle(px - 6, bottom, 12, GROUND_Y - bottom, color).setOrigin(0, 0).setDepth(4);
-      add.rectangle(px + 3, bottom, 3, GROUND_Y - bottom, RIM_COLOR, 0.25).setOrigin(0, 0).setDepth(4).setBlendMode(Phaser.BlendModes.ADD);
+      add.rectangle(px + 3, bottom, 3, GROUND_Y - bottom, this.rim, 0.25).setOrigin(0, 0).setDepth(4).setBlendMode(Phaser.BlendModes.ADD);
       add.rectangle(px - 10, GROUND_Y - 10, 20, 12, color).setOrigin(0, 0).setDepth(4);
     }
   }
@@ -372,10 +380,10 @@ export class Level {
           const px = s.x + s.w * k;
           const top = s.y + s.h;
           add.rectangle(px - 6, top, 12, GROUND_Y - top, 0x2a1638).setOrigin(0, 0).setDepth(4);
-          add.rectangle(px + 3, top, 3, GROUND_Y - top, RIM_COLOR, 0.25).setOrigin(0, 0).setDepth(4).setBlendMode(Phaser.BlendModes.ADD);
+          add.rectangle(px + 3, top, 3, GROUND_Y - top, this.rim, 0.25).setOrigin(0, 0).setDepth(4).setBlendMode(Phaser.BlendModes.ADD);
           add.rectangle(px - 10, GROUND_Y - 10, 20, 12, 0x2a1638).setOrigin(0, 0).setDepth(4);
         }
-        addTiled(this.scene, s.x, s.y, s.w, s.h, 'tex_brick', 0.5, 5, BRICK_TINT);
+        addTiled(this.scene, s.x, s.y, s.w, s.h, 'tex_brick', 0.5, 5, graded(BRICK_TINT));
         // объём: низ выступа в тени, тонкий тёмный контур — не сливается с городом позади
         add.image(s.x, s.y, 'shade_v').setOrigin(0, 0).setDisplaySize(s.w, s.h).setDepth(5);
         add.rectangle(s.x, s.y + s.h - 3, s.w, 3, OUTLINE, 0.9).setOrigin(0, 0).setDepth(5);
@@ -384,12 +392,12 @@ export class Level {
       }
       case 'wall': {
         const tex = s.climbable ? 'tex_climb' : 'tex_brick';
-        addTiled(this.scene, s.x, s.y, s.w, s.h, tex, s.climbable ? 0.45 : 0.5, 5, BRICK_TINT);
+        addTiled(this.scene, s.x, s.y, s.w, s.h, tex, s.climbable ? 0.45 : 0.5, 5, graded(BRICK_TINT));
         // светотень как у фасада: края темнее (объём колонны), книзу уходит в тень
         add.image(s.x, s.y, 'shade_h').setOrigin(0, 0).setDisplaySize(s.w, s.h).setDepth(5);
         add.image(s.x, s.y, 'shade_v').setOrigin(0, 0).setDisplaySize(s.w, s.h).setDepth(5);
         // тёплый блик заката по краю со стороны солнца (справа) и тёмный контур с другой
-        add.rectangle(s.x + s.w - 5, s.y, 5, s.h, RIM_COLOR, 0.32).setOrigin(0, 0).setDepth(5).setBlendMode(Phaser.BlendModes.ADD);
+        add.rectangle(s.x + s.w - 5, s.y, 5, s.h, this.rim, 0.32).setOrigin(0, 0).setDepth(5).setBlendMode(Phaser.BlendModes.ADD);
         add.rectangle(s.x, s.y, 3, s.h, OUTLINE, 0.85).setOrigin(0, 0).setDepth(5);
         add.rectangle(s.x + s.w - 2, s.y, 2, s.h, OUTLINE, 0.6).setOrigin(0, 0).setDepth(5);
         // тень у основания — стена «стоит» на крыше
