@@ -5,8 +5,11 @@ import type { Sparks } from './fx';
 import type { Solid } from './Level';
 
 const SPEED = 1900;
-const AIM_RANGE = 1000;
-const AIM_CONE = Phaser.Math.DegToRad(40);
+const AIM_RANGE = 1200;
+const AIM_CONE = Phaser.Math.DegToRad(60);
+/** Совсем рядом попадаем в любого — даже ниже руки, вплотную или чуть за спиной. */
+const CLOSE_RANGE = 260;
+const CLOSE_BEHIND = 70;
 const HIT_R = 34;
 /** Длина хвоста-нити за снарядом, px. */
 const TRAIL_LEN = 240;
@@ -57,6 +60,7 @@ export class Web {
   }
 
   fire(from: { x: number; y: number }, facing: number, targets: WebTarget[]) {
+    // автоприцел щедрый: жмёшь — и паутина находит ближайшего шалуна впереди
     let target: WebTarget | null = null;
     let best = Infinity;
     for (const d of targets) {
@@ -64,9 +68,13 @@ export class Web {
       const dx = d.x - from.x;
       const dy = d.y - from.y;
       const dist = Math.hypot(dx, dy);
-      if (dist > AIM_RANGE || dx * facing <= 0) continue;
-      if (Math.abs(Math.atan2(dy, Math.abs(dx))) <= AIM_CONE && dist < best) {
-        best = dist;
+      const close = dist < CLOSE_RANGE && dx * facing > -CLOSE_BEHIND;
+      const ahead = dist < AIM_RANGE && dx * facing > 0 && Math.abs(Math.atan2(dy, Math.abs(dx))) <= AIM_CONE;
+      if (!close && !ahead) continue;
+      // в кого уже летит паутина — в последнюю очередь: очередь выстрелов разбирает всех по одному
+      const score = dist + (this.shots.some((s) => s.target === d) ? 100000 : 0);
+      if (score < best) {
+        best = score;
         target = d;
       }
     }
