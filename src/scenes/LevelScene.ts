@@ -46,6 +46,8 @@ const SLOWMO_K = 0.3;
 const PIGEON_FALL_MS = 650;
 /** Финал: герой подошёл к последнему насесту на столько — сценка (крупный план, петля, улетает). */
 const FINALE_X = 900;
+/** Уровень с боссом: подошёл к Ворону на столько — он улетает на арену и начинается битва. */
+const BOSS_CALL_X = 600;
 /** Крупный план Ворона в начале уровня, с. */
 const INTRO_S = 2.4;
 const INTRO_ZOOM = 1.45;
@@ -219,6 +221,7 @@ export class LevelScene extends Phaser.Scene {
     const a = this.level.arena!;
     this.bossStarted = true;
     this.crow.hold = false;
+    this.crow.laughNow();
     this.crow.startBoss(a.perches, this.def.items[1]);
     (this.scene.get('UI') as UIScene).showBossBar(BOSS_HITS);
     feedback.caw(0.9);
@@ -379,7 +382,9 @@ export class LevelScene extends Phaser.Scene {
     this.checkFlags();
     const arena = this.level.arena;
     if (arena) {
-      if (!this.bossStarted && this.hero.x > arena.x + 150) this.startBoss();
+      // подошёл к Ворону на последнем насесте (или сразу на арену) — он улетает на арену, битва
+      const near = this.crow.atLastPerch && this.crow.x - this.hero.x < BOSS_CALL_X;
+      if (!this.bossStarted && (near || this.hero.x > arena.x + 150)) this.startBoss();
       // вещи босса собраны — победа
       if (this.bossDown && !this.won && this.level.items.every((i) => !this.isBossItem(i.key) || i.state === 'collected')) this.win();
     } else if (!this.finale && this.crow.atLastPerch && this.crow.x - this.hero.x < FINALE_X) this.startFinale();
