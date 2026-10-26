@@ -1,6 +1,6 @@
 {
-  "name": "Август-герой",
-  "short_name": "Август-герой",
+  "name": "Герой",
+  "short_name": "Герой",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

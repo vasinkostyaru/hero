@@ -1,6 +1,6 @@
 {
   "appId": "com.avgust.hero",
-  "appName": "Август-герой",
+  "appName": "Герой",
   "webDir": "dist",
   "android": {
     "backgroundColor": "#000000"
